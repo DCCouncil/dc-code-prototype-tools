@@ -1,6 +1,7 @@
 # Spits up a <dc-code> master file into many smaller files
 # and inserts XIncludes to tie them all together.
 #
+# Usage:
 # python3 split_up.py dest_dir < code.xml
 
 import sys, os, os.path, lxml.etree
