@@ -204,8 +204,9 @@ def parse_doc_section(section, dom, state):
 				# A placeholder for an expired/repealed section or range of sections.
 				# This has to come before the normal section number/title line regex.
 				if sec is not None: do_paragraph_indentation(sec)
-				sec = make_node(state["stack"][-1][1], "placeholder", None)
-				if M.groupdict()["type"]: make_node(sec, "type", M.groupdict()["type"])
+				sec = make_node(state["stack"][-1][1], "level", None)
+				make_node(sec, "type", "placeholder")
+				if M.groupdict()["type"]: make_node(sec, "reason", M.groupdict()["type"])
 				make_node(sec, "section-start" if M.groupdict()["section_end"] else "section", M.groupdict()["section_start"])
 				if M.groupdict()["section_end"]:
 					make_node(sec, "section-end", M.groupdict()["section_end"])
@@ -217,8 +218,9 @@ def parse_doc_section(section, dom, state):
 				# A placeholder for an expired/repealed section or range of sections.
 				# This has to come before the normal section number/title line regex.
 				if sec is not None: do_paragraph_indentation(sec)
-				sec = make_node(state["stack"][-1][1], "placeholder", None)
-				make_node(sec, "type", M.groupdict()["type"])
+				sec = make_node(state["stack"][-1][1], "level", None)
+				make_node(sec, "type", "placeholder")
+				make_node(sec, "reason", M.groupdict()["type"])
 				make_node(sec, "section", M.groupdict()["section_start"])
 				if M.groupdict().get("title"): make_node(sec, "heading", M.groupdict()["title"])
 				annos = None

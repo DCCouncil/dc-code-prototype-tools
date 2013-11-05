@@ -19,11 +19,11 @@ def make_node(parent, tag, text, **attrs):
 def write_node(node, path, filename, backpath, toc):
 	# Besides in Sections, move any <level>s into separate files
 	# and replace them with XInclude tags.
-	if node.tag != "placeholder" and node.xpath("string(type)") != "Section":
-		for child in node.xpath("level[not(type='annotations')]|placeholder"):
+	if node.xpath("string(type)") not in ("Section", "placeholder"):
+		for child in node.xpath("level[not(type='annotations')]"):
 			# When we recurse, where should we put the file?
 
-			if child.tag == "placeholder":
+			if child.xpath("string(type)") == "placeholder":
 				if child.xpath("string(section)"):
 					fn = child.xpath("string(section)") + "~P.xml"
 				elif child.xpath("string(section-start)") and child.xpath("string(section-end)"):
@@ -46,9 +46,9 @@ def write_node(node, path, filename, backpath, toc):
 			
 			toc_entry = make_node(toc, child.tag, None)
 			make_node(toc_entry, "href", path + sub_path + fn)
-			for tag in ("type", "num", "section", "section-start", "section-end", "section-range-type", "heading"):
+			for tag in ("type", "num", "section", "section-start", "section-end", "section-range-type", "heading", "reason"):
 				if child.xpath("string(%s)" % tag): make_node(toc_entry, tag, child.xpath("string(%s)" % tag))
-			if child.tag != "placeholder" and child.xpath("string(type)") != "Section": 
+			if child.xpath("string(type)") not in ("Section", "placeholder"): 
 				toc_entry_container = make_node(toc_entry, "children", None)
 			else:
 				toc_entry_container = None
@@ -67,7 +67,7 @@ def write_node(node, path, filename, backpath, toc):
 	# Write the remaining part out to disk.
 	with open(sys.argv[1] + path + filename, "wb") as f:
 		# lxml.etree.ProcessingInstruction does not work. Write the PI directly.
-		f.write(('<?xml-stylesheet href="%srender/%s.xsl" type="text/xsl" ?>\n' % (backpath, "section" if node.xpath("string(type)") == "Section" else "biglevel")).encode("utf8"))
+		f.write(('<?xml-stylesheet href="%srender/%s.xsl" type="text/xsl" ?>\n' % (backpath, "section" if node.xpath("string(type)") in ("Section", "placeholder") else "biglevel")).encode("utf8"))
 		f.write(lxml.etree.tostring(node, pretty_print=True, encoding="utf-8", xml_declaration=False))
 
 # Read in the master code file.
