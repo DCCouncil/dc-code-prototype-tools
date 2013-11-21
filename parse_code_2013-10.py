@@ -349,6 +349,7 @@ def parse_doc_section(section, dom, state):
 
 			if sec is not None: do_paragraph_indentation(sec)
 			sec = None
+			annos = None
 			cur_form_node = None
 
 	if sec is not None: do_paragraph_indentation(sec)
