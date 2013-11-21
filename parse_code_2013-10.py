@@ -54,6 +54,7 @@ def parse_doc_section(section, dom, state):
 	sec = None
 	annos = None
 	anno_levels = None
+	cur_form_node = None
 
 	for para_index, para in enumerate(section["paragraphs"]):
 		psty = para["properties"].get("style")
@@ -134,8 +135,14 @@ def parse_doc_section(section, dom, state):
 			# to leave them as italic spans.
 			is_para_level = False
 			parent_node = sec
-			while len(para["runs"]) > 0 and re_match("\([0-9A-Za-z\-\.]+\)\s*|[0-9a-z\-]+\.\s+", para["runs"][0]["text"], dollar_sign=False, case_sensitive=True):
+			was_form = False
+			while len(para["runs"]) > 0 and re_match(("" if psty != "form" else r"\s*") + "\([0-9A-Za-z\-\.]+\)\s*|[0-9a-z\-]+\.\s+", para["runs"][0]["text"], dollar_sign=False, case_sensitive=True):
+				if psty == "form" and len(para["runs"]) > 0 and "Do you know of any will or codicil of" in para["runs"][0]:
+					# This is not a level.
+					break
+
 				num = M.group(0)
+				if num.strip() == "(Signed)": break # not numbering
 				parent_node = make_node(sec, "level", None)
 				make_node(parent_node, "num", num.strip())
 				is_para_level = True
@@ -145,6 +152,16 @@ def parse_doc_section(section, dom, state):
 				r["text"] = r["text"][len(num):]
 				if r["text"] == "": para["runs"].pop(0) # remove run if nothing left
 
+				# The 'form' class is way over-applied. If numbering appears in a 'form' paragraph,
+				# assume this was an encoding mistake and make it a regular body paragraph. In these
+				# cases, we also find leading spaces that we don't find in regular section numbering,
+				# which is included in the regex up top. We also find embedded newlines between non-form
+				# content and form content.
+				# Except one place it's actually correct as-is and we can hard-code an exception above.
+				if psty == "form":
+					psty = "sectext"
+					was_form = True
+
 			# Parse italic text at the beginning which is the paragraph's header text.'
 			if is_para_level and len(para["runs"]) > 0 and para["runs"][0]["properties"].get("i") == True:
 				t = para["runs"][0]["text"]
@@ -152,18 +169,56 @@ def parse_doc_section(section, dom, state):
 				make_node(parent_node, "heading", t)
 				para["runs"].pop(0) # remove it
 
-			# Make a node for the text in the last numbered-paragraph-level we created.
-			if len(para["runs"]) > 0:
-				t = make_node(parent_node, "text", "") # initialize with empty text content
-				if psty == "sectext":
+			def process_para(psty, runs):
+				global cur_form_node
+
+				# Make a node for the text in the innermost numbered-paragraph-level we created.
+				text_parent_node = parent_node
+
+				# Group consecutive form paragraphs into a level.
+				if psty in ("form", "formc"):
+					if cur_form_node is None:
+						cur_form_node = make_node(parent_node, "level", None)
+						make_node(cur_form_node, "type", "form")
+					text_parent_node = cur_form_node
+				else:
+					# clear state
+					cur_form_node = None
+
+				t = make_node(text_parent_node, "text", "") # initialize with empty text content
+				if psty in ("sectext", "form"):
 					pass # no special class
-				elif psty == "sectextc":
+				elif psty in ("sectextc", "formc"):
 					t.set("class", "centered")
 				else:
 					t.set("class", psty)
-				runs_to_node(t, para["runs"])
+				runs_to_node(t, runs)
+
+			if was_form:
+				# There are cases where two paragraphs are merged with an internal hard line break,
+				# and the first part is regular body text and the second part is form content.
+				runs0 = []
+				runs1 = []
+				saw_n = False
+				for r in para["runs"]:
+					if saw_n or not "\n" in r["text"]:
+						if not saw_n:
+							runs0.append(r)
+						else:
+							runs1.append(r)
+					else:
+						t0, t1 = r["text"].split("\n", 1)
+						runs0.append({ "text": t0, "properties": r["properties"] })
+						runs1.append({ "text": t1, "properties": r["properties"] })
+				if len(runs0) > 0: process_para(psty, runs0)
+				if len(runs1) > 0: process_para("form", runs1)
+			else:
+				if len(para["runs"]) > 0:
+					process_para(psty, para["runs"])
 
 		elif psty in ("annotations", "annotationsc", "history"):
+			cur_form_node = None
+
 			parent_node = sec
 			if sec is None:
 				if context_path in (
@@ -218,6 +273,7 @@ def parse_doc_section(section, dom, state):
 					make_node(sec, "section-range-type", "list" if M.groupdict()["section_range_type"] == "," else "range")
 				if M.groupdict().get("title"): make_node(sec, "heading", M.groupdict()["title"])
 				annos = None
+				cur_form_node = None
 				continue
 			elif re_match("§§? (?P<section_start>\S*[^\.])\.? (?P<title>.*\S|)" + placeholder_types, ptext):
 				# A placeholder for an expired/repealed section or range of sections.
@@ -229,6 +285,7 @@ def parse_doc_section(section, dom, state):
 				make_node(sec, "section", M.groupdict()["section_start"])
 				if M.groupdict().get("title"): make_node(sec, "heading", M.groupdict()["title"])
 				annos = None
+				cur_form_node = None
 				continue
 
 			elif re_match("§ (\d+A?(?::[\d\.A-Za-z]+)?-[\d\.\-A-Za-z]*[\d\-A-Za-z]).(?:\s*(.*))?", ptext):
@@ -245,6 +302,7 @@ def parse_doc_section(section, dom, state):
 			make_node(sec, "heading", section_title)
 
 			annos = None
+			cur_form_node = None
 
 		elif sec is None and psty in ("analysis", "analysisc"):
 			# seems to be the table of contents at the start of each level
@@ -286,6 +344,7 @@ def parse_doc_section(section, dom, state):
 
 			if sec is not None: do_paragraph_indentation(sec)
 			sec = None
+			cur_form_node = None
 
 	if sec is not None: do_paragraph_indentation(sec)
 
