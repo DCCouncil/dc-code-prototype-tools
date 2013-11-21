@@ -155,7 +155,12 @@ def parse_doc_section(section, dom, state):
 			# Make a node for the text in the last numbered-paragraph-level we created.
 			if len(para["runs"]) > 0:
 				t = make_node(parent_node, "text", "") # initialize with empty text content
-				if psty not in ("sectext", "sectextc"): t.set("class", psty)
+				if psty == "sectext":
+					pass # no special class
+				elif psty == "sectextc":
+					t.set("class", "centered")
+				else:
+					t.set("class", psty)
 				runs_to_node(t, para["runs"])
 
 		elif psty in ("annotations", "annotationsc", "history"):
