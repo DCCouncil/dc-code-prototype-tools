@@ -54,7 +54,7 @@ def parse_doc_section(section, dom, state):
 	sec = None
 	annos = None
 	anno_levels = None
-	cur_form_node = None
+	cur_form_node = (None, None)
 
 	for para_index, para in enumerate(section["paragraphs"]):
 		psty = para["properties"].get("style")
@@ -177,21 +177,26 @@ def parse_doc_section(section, dom, state):
 
 				# Group consecutive form paragraphs into a level.
 				if psty in ("form", "formc"):
-					if cur_form_node is None:
-						cur_form_node = make_node(parent_node, "level", None)
-						make_node(cur_form_node, "type", "form")
-					text_parent_node = cur_form_node
+					if cur_form_node is None or cur_form_node[0] != "form":
+						cur_form_node = ("form", make_node(parent_node, "level", None))
+						make_node(cur_form_node[1], "type", "form")
+					text_parent_node = cur_form_node[1]
+				elif psty in ("table", "tablec", "PlainText"):
+					if cur_form_node is None or cur_form_node[0] != "table":
+						cur_form_node = ("table", make_node(parent_node, "level", None))
+						make_node(cur_form_node[1], "type", "table")
+					text_parent_node = cur_form_node[1]
 				else:
 					# clear state
 					cur_form_node = None
 
 				t = make_node(text_parent_node, "text", "") # initialize with empty text content
-				if psty in ("sectext", "form"):
+				if psty in ("sectext", "form", "table", "PlainText"):
 					pass # no special class
-				elif psty in ("sectextc", "formc"):
+				elif psty in ("sectextc", "formc", "tablec"):
 					t.set("class", "centered")
 				else:
-					t.set("class", psty)
+					raise ValueError(psty)
 				runs_to_node(t, runs)
 
 			if was_form:
