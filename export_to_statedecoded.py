@@ -102,9 +102,15 @@ def render_body(node, dom, with_heading=True):
 			# ignore <span>s that give styled text by just rendering the text content of the node
 			# and except if this is the top Section-level, put the level's heading inside the first
 			# text paragraph. (The number is handled by the level above because it goes in an attribute.)
+			if child.get("encoding") != "xhtml":
+				text_node = child
+			else:
+				# this is XHTML content that needs to be parsed/unescaped
+				text_node = lxml.etree.fromstring("<wrapper>" + child.text + "</wrapper>")
+
 			append_text(dom, ""
 				+ ((node.xpath("string(heading)") + " -- ") if i == 0 and node.xpath("string(heading)") and with_heading  else "")
-				+ lxml.etree.tostring(child, method='text', encoding=str))
+				+ lxml.etree.tostring(text_node, method='text', encoding=str))
 		elif child.tag == "level":
 			# if the node has a heading but the first child is not text, put the heading in now
 			if i == 0 and node.xpath("string(heading)") and with_heading:

@@ -64,6 +64,10 @@ def write_node(node, path, filename, backpath, toc):
 			child.addprevious(xi)
 			child.getparent().remove(child)
 
+	# lxml doesn't round-trip CDATA, so put those back.
+	for child in node.xpath("//text[@encoding='xhtml']"):
+		child.text = lxml.etree.CDATA(child.text)
+
 	# Write the remaining part out to disk.
 	with open(sys.argv[1] + path + filename, "wb") as f:
 		# lxml.etree.ProcessingInstruction does not work. Write the PI directly.

@@ -3,7 +3,7 @@
 # Usage:
 # python3 parse_code_2013-10.py path/to/2013-10.docx
 
-import sys, re, lxml.etree as etree, os.path, json
+import sys, re, lxml.etree as etree, cgi, os.path, json
 from worddoc import open_docx
 
 heading_case_fix = { }
@@ -416,11 +416,18 @@ def do_paragraph_indentation(node):
 
 		form_indent(clist, result, None)
 
-def runs_to_node(node, runs):
+def runs_to_node(container, runs):
 	if len(runs) == 0: return
+
+	# Remove trailing space.
 	runs[-1]["text"] = runs[-1]["text"].rstrip()
 
-	# Appending text inside a mixed-content node is a bit complicated with lxml.
+	# Build up the text as a raw XHTML string. Mixed content XML is a major pain to
+	# parse with some tools, so we'll insert the XHTML as the CDATA-escaped content
+	# of the node. But assemble it first in a temporary DOM to guarantee that we get
+	# the XHTML correct.
+	node = etree.Element("tmp")
+	node.text = "" # initialize so we can append a string to it
 	for r in runs:
 		# Remove default properties.
 		if r["properties"].get("font") == "Times New Roman":
@@ -456,6 +463,16 @@ def runs_to_node(node, runs):
 				else:
 					raise ValueError(repr((k,v)))
 			rn.set("style", sty)
+
+	if len(node) == 0:
+		# Only text content.
+		container.text = node.text
+	else:
+		# Put the serialized XHTML into the DOM using a CDATA section for clarity if necessary. Serialize
+		# not to bytes but to Unicode (str) characters.
+		text = cgi.escape(node.text) + ''.join([etree.tostring(child, encoding=str) for child in node.iterchildren()])
+		container.set("encoding", "xhtml")
+		container.text = etree.CDATA(text)
 
 def para_text_content(p):
 	return "".join(r["text"] for r in p["runs"]).strip()
