@@ -1,4 +1,4 @@
-# Spits up a <dc-code> master file into many smaller files
+# Spits up a DC Code master file into many smaller files
 # and inserts XIncludes to tie them all together.
 #
 # Usage:

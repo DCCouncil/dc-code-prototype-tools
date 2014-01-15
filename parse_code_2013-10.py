@@ -18,9 +18,10 @@ def main():
 		heading_case_fix[t.upper()] = t
 
 	# Form the output DOM.
-	dom = etree.Element("dc-code")
+	dom = etree.Element("level")
+	make_node(dom, "type", "document")
+	make_node(dom, "heading", "Code of the District of Columbia")
 	meta = make_node(dom, "meta", None)
-	make_node(meta, "title", "Code of the District of Columbia")
 	make_node(meta, "recency", "current through DC Act 19-658; unofficial through D.C. Act 19-682")
 	
 	# Open the Word file. Use a cached json file if it exists

@@ -75,7 +75,7 @@ def traverse_tree(node, spine, index):
 		write_section(node, spine, index)
 		return
 
-	if node.tag == "level": # not the dc-code root element
+	if node.xpath("string(type)") != "document": # not the root element
 		spine = spine + [
 			(
 				node.xpath("string(heading)"),

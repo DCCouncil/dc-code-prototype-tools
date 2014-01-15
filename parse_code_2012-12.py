@@ -10,9 +10,10 @@ ANNOTATION_HEADINGS = ("CREDIT(S)", "HISTORICAL AND STATUTORY NOTES", "UNIFORM C
 
 def main():
 	# Form the output dom.
-	dom = etree.Element("dc-code")
+	dom = etree.Element("level")
+	make_node(dom, "type", "document")
+	make_node(dom, "heading", "Code of the District of Columbia")
 	meta = make_node(dom, "meta", None)
-	make_node(meta, "title", "Code of the District of Columbia")
 	make_node(meta, "current-through", "2012-12-11")
 	
 	# Where did we insert the previous section into the table of contents hierarchy?
