@@ -7,15 +7,27 @@ import sys, re, lxml.etree as etree, os.path, json
 from worddoc import open_docx
 
 heading_case_fix = { }
+little_words = set()
 
 def main():
 	# Use the West XML to get headings in titlecase. The Lexis document has
-	# big level headings in all caps.
+	# big level headings in all caps. Also get a list of words that always
+	# appear in lowercase so we can correct the remaining titles reasonably well.
 	west_dom = etree.parse(open("/home/user/data/dc_code/2012-12-11.xml", "rb"))
-	for h in west_dom.xpath('//heading'):
+	is_upper_word = set()
+	for h in west_dom.xpath('//level[not(type="Section")]/heading'):
 		t = h.text.replace(" (Refs & Annos)", "")
 		t = re.sub("[\s\.]+$", "", t)
 		heading_case_fix[t.upper()] = t
+		for wd in t.split(" "):
+			if not re.search(r"[a-z]", wd): continue
+			if wd == wd.lower():
+				little_words.add(wd)
+			else:
+				is_upper_word.add(wd.lower())
+	little_words.difference_update(is_upper_word)
+	little_words.remove("disapproval") # manual fix
+	little_words.remove("abolished") # manual fix
 
 	# Form the output DOM.
 	dom = etree.Element("level")
@@ -330,8 +342,14 @@ def parse_doc_section(section, dom, state):
 			level_title = re.sub("\s+", " ", level_title) # newlines
 			level_title = re.sub("[\s\.]+$", "", level_title) # trailing spaces and periods
 
-			# Correct case.
+			# Correct spaces and case.
+			level_title = level_title.strip()
 			level_title = heading_case_fix.get(level_title, level_title)
+			if level_title == level_title.upper():
+				# if not found in the West code and it's still all uppercase, make it
+				# title case but then undo the title-casing of an exception word list.
+				level_title = level_title.title()
+				for wd in little_words: level_title = re.sub("(?i) %s " % re.escape(wd), " %s " % wd, level_title)
 
 			# This is a TOC level. If the level exists on the TOC stack,
 			# pop to that level. Otherwise append within the innermost
