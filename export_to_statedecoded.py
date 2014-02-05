@@ -57,7 +57,9 @@ def write_section(node, spine, index):
 
 	# body content
 	body_content = make_node(dom, "text", "")
-	render_body(node, body_content, with_heading=False)
+	body_section = make_node(body_content, "section", "")
+
+	render_body(node, body_section, with_heading=False)
 
 	# annotation content
 	history_content = make_node(dom, "history", "")
@@ -76,17 +78,18 @@ def traverse_tree(node, spine, index):
 		return
 
 	if node.xpath("string(type)") != "document": # not the root element
-		spine = spine + [
-			(
-				node.xpath("string(heading)"),
-				{
-					"label": node.xpath("string(type)"),
-					"identifier": node.xpath("string(num)"),
-					"order_by": str(index).zfill(10),
-					"level": str(len(spine)+1),
-				}
-			)
-		]
+		if node.xpath("string(heading)"):
+			spine = spine + [
+				(
+					node.xpath("string(heading)"),
+					{
+						"label": node.xpath("string(type)"),
+						"identifier": node.xpath("string(num)"),
+						"order_by": str(index).zfill(10),
+						"level": str(len(spine)+1),
+					}
+				)
+			]
 
 	for i, child in enumerate(node.xpath("level")):
 		traverse_tree(child, spine, i)
@@ -111,7 +114,7 @@ def render_body(node, dom, with_heading=True):
 				append_text(dom, node.xpath("string(heading)"))
 
 			append_text(dom, "") # force paragraph-like whitespace above the new node
-			lvl = make_node(dom, "structure", "")
+			lvl = make_node(dom, "section", "")
 			lvl.tail = ""
 
 			typ = child.xpath("string(type)")
