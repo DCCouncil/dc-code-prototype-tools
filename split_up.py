@@ -66,8 +66,6 @@ def write_node(node, path, filename, backpath, toc):
 
 	# Write the remaining part out to disk.
 	with open(sys.argv[1] + path + filename, "wb") as f:
-		# lxml.etree.ProcessingInstruction does not work. Write the PI directly.
-		f.write(('<?xml-stylesheet href="%srender/%s.xsl" type="text/xsl" ?>\n' % (backpath, "section" if node.xpath("string(type)") in ("Section", "placeholder") else "biglevel")).encode("utf8"))
 		f.write(lxml.etree.tostring(node, pretty_print=True, encoding="utf-8", xml_declaration=False))
 
 # Read in the master code file.
