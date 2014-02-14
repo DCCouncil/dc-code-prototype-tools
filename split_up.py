@@ -16,11 +16,22 @@ def make_node(parent, tag, text, **attrs):
     n.set(k, v)
   return n
 
-def write_node(node, path, filename, backpath, toc):
-	# Besides in Sections, move any <level>s into separate files
-	# and replace them with XInclude tags.
-	if node.xpath("string(type)") not in ("Section", "placeholder"):
-		for child in node.xpath("level[not(type='annotations')]"):
+def write_node(node, path, filename, backpath, toc, seen_filenames):
+	# Besides in Sections, move any <level>s --- besides Divisions --- into separate files
+	# and replace them with XInclude tags. We don't split at Divisions because these are
+	# of no interest to anyone, the numbering of titles has global scope, and it just feels
+	# like clutter.
+	if node.xpath("string(type)") == "document":
+		subnodes = node.xpath("level[type='Division']/level[type='Title']")
+	elif node.xpath("string(type)") == "Title":
+		subnodes = node.xpath("level[not(type='annotations') and not(type='Subtitle')] | level[type='Subtitle']/level[not(type='annotations')]")
+	elif node.xpath("string(type)") not in ("Section", "placeholder"):
+		subnodes = node.xpath("level[not(type='annotations')]")
+	else:
+		subnodes = None
+
+	if subnodes:
+		for child in subnodes:
 			# When we recurse, where should we put the file?
 
 			if child.xpath("string(type)") == "placeholder":
@@ -55,7 +66,7 @@ def write_node(node, path, filename, backpath, toc):
 
 			# Recurse into this node.
 
-			write_node(child, path + sub_path, fn, bp, toc_entry_container)
+			write_node(child, path + sub_path, fn, bp, toc_entry_container, seen_filenames)
 
 			# Replace the node with an XInclude.
 
@@ -65,7 +76,12 @@ def write_node(node, path, filename, backpath, toc):
 			child.getparent().remove(child)
 
 	# Write the remaining part out to disk.
-	with open(sys.argv[1] + path + filename, "wb") as f:
+
+	fn = sys.argv[1] + path + filename
+	if fn in seen_filenames: raise Exception("Sanity check failed. Two parts of the code mapped to the same file name.")
+	seen_filenames.add(fn)
+
+	with open(fn, "wb") as f:
 		f.write(lxml.etree.tostring(node, pretty_print=True, encoding="utf-8", xml_declaration=False))
 
 # Read in the master code file.
@@ -75,7 +91,7 @@ dom = lxml.etree.parse(sys.stdin.buffer, lxml.etree.XMLParser(remove_blank_text=
 toc = lxml.etree.Element("toc")
 
 # Write out the split-up XML files.
-write_node(dom.getroot(), '/', "index.xml", "", toc)
+write_node(dom.getroot(), '/', "index.xml", "", toc, set())
 
 # Write out the TOC file.
 with open(sys.argv[1] + 'toc.xml', "wb") as f:
