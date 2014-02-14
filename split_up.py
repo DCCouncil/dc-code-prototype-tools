@@ -4,7 +4,7 @@
 # Usage:
 # python3 split_up.py dest_dir < code.xml
 
-import sys, os, os.path, lxml.etree
+import sys, os, os.path, lxml.etree, re
 
 def make_node(parent, tag, text, **attrs):
   """Make a node in an XML document."""
@@ -49,7 +49,7 @@ def write_node(node, path, filename, backpath, toc, seen_filenames):
 				bp = backpath
 			else:
 				fn = "index.xml"
-				sub_path = child.xpath("string(type)") + "-" + child.xpath("string(num)") + "/"
+				sub_path = clean_filename(child.xpath("string(type)") + "-" + child.xpath("string(num)")) + "/"
 				if not os.path.exists(sys.argv[1] + path + sub_path): os.mkdir(sys.argv[1] + path + sub_path)
 				bp = backpath + "../"
 
@@ -71,18 +71,21 @@ def write_node(node, path, filename, backpath, toc, seen_filenames):
 			# Replace the node with an XInclude.
 
 			xi = lxml.etree.Element("{http://www.w3.org/2001/XInclude}include")
-			xi.set("href", sub_path + fn)
+			xi.set("href", sub_path + clean_filename(fn))
 			child.addprevious(xi)
 			child.getparent().remove(child)
 
 	# Write the remaining part out to disk.
 
-	fn = sys.argv[1] + path + filename
+	fn = sys.argv[1] + path + clean_filename(filename)
 	if fn in seen_filenames: raise Exception("Sanity check failed. Two parts of the code mapped to the same file name.")
 	seen_filenames.add(fn)
 
 	with open(fn, "wb") as f:
 		f.write(lxml.etree.tostring(node, pretty_print=True, encoding="utf-8", xml_declaration=False))
+
+def clean_filename(fn):
+	return re.sub("[^0-9A-Za-z\-\.\~]+", "_", fn)
 
 # Read in the master code file.
 dom = lxml.etree.parse(sys.stdin.buffer, lxml.etree.XMLParser(remove_blank_text=True))
