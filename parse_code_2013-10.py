@@ -34,7 +34,7 @@ def main():
 	make_node(dom, "type", "document")
 	make_node(dom, "heading", "Code of the District of Columbia")
 	meta = make_node(dom, "meta", None)
-	make_node(meta, "recency", "current through DC Act 19-658; unofficial through D.C. Act 19-682")
+	make_node(meta, "recency", "December 13, 2013 and through D.C. Act 20-210 (except D.C. Acts 20-130, 20-157, and 20-204)")
 	
 	# Open the Word file. Use a cached json file if it exists
 	# since that's faster that opening the raw .docx file.
@@ -83,25 +83,27 @@ def parse_doc_section(section, dom, state):
 				continue
 			state["stack"] = [(None, dom)]
 
+		if psty == "Division" and ptext == "PARALLEL REFERENCE TABLE":
+			# Done!
+			break
+
 		# Correct mistakes in the document.
 		context_path = "/".join([n[0] + ":" + n[1].xpath("string(num)") for n in state["stack"][1:]])
-		if psty == "sectextc" and ptext in ("PART D-i", "PART A", "PART F-i"):
-			# This problem occurs more than once. Oddly specific to "PART D-i".
-			psty = "Part"
-			ptext += "\n" + para_text_content(section["paragraphs"][para_index+2])
-			section["paragraphs"][para_index+2]["runs"] = [] # prevent processing later
-		elif psty == "sectextc" and re_match("SUBPART \d+A?", ptext):
-			psty = "Subpart"
-			ptext += "\n" + para_text_content(section["paragraphs"][para_index+2])
-			section["paragraphs"][para_index+2]["runs"] = [] # prevent processing later
-		elif psty == "sectextc" and re_match("CHAPTER 31A1", ptext):
-			psty = "Chapter"
-			ptext += "\n" + para_text_content(section["paragraphs"][para_index+1])
-			section["paragraphs"][para_index+1]["runs"] = [] # prevent processing later
+		if psty == "sectextc" and re_match("(SUBTITLE|PART|SUBPART|CHAPTER|SUBCHAPTER) [A-Za-z0-9\-]+$", ptext):
+			# "PART D-i", "PART A", "PART F-i", "PART B-i", "PART XII", "SUBCHAPTER VII-E", various SUBPARTs,
+			# etc., which seems like some bad preprocessing on Lexis's side. The next paragraph is usually empty,
+			# and then the actual heading text appears. For "CHAPTER 31A1", the heading text appeared on the
+			# next paragraph in the 2013-10 file but not in the 2014-02 file.
+			psty = M.group(1).title() # "Part", "Subpart", etc.
+			for i in (1, 2):
+				if para_text_content(section["paragraphs"][para_index+i]).strip() != "":
+					ptext += "\n" + para_text_content(section["paragraphs"][para_index+i])
+					section["paragraphs"][para_index+i]["runs"] = [] # prevent processing later
+					break
 
 		elif psty == "sectextc" and re_match("SUBCHAPTER II-A|BLOOMINGDALE AND LEDROIT PARK BACKWATER VALVES", ptext):
 			continue # repeated/weird text
-		elif psty == "sectextc" and context_path == "Division:V/Title:32/Chapter:13/Subchapter:I" and ptext in ("SUBCHAPTER I", "GENERAL"):
+		elif psty == "sectextc" and context_path == "Division:V/Title:32/Chapter:13/Subchapter:I" and ptext == "GENERAL":
 			continue # repeated/weird text
 
 		elif psty == "Section" and re_match(r"(§ 1-15-\d+\.) \n\n([(\[].*)", ptext):
@@ -136,8 +138,19 @@ def parse_doc_section(section, dom, state):
 		if psty in ("sectext", "sectextc", "form", "formc", "table", "tablec", "PlainText"):
 			# "form" appears in §1-204.63.
 
-			if sec is None: raise Exception("Not in a section. %s / %s" % (repr(ptext), context_path))
-			if annos is not None: raise Exception("Inside annotations.")
+			if sec is not None:
+				pass
+			elif (context_path.startswith("Division:III/Title:21/Chapter:24/") or context_path == "Division:V/Title:32/Chapter:13/Subchapter:I") \
+			 and re_match('§ [IV]+\.', ptext, dollar_sign=False):
+				# This is body text in something like a preamble to the subchapter. It
+				# does not count as an actual section, I guess, since it is not citable
+				# by title and number. Treat the next lines as if we're inside a section,
+				# but we're putting the content actually inside the Subchapter.
+				sec = state["stack"][-1][1]
+			else:
+				raise Exception("Not in a section. %s / %s" % (repr(ptext), context_path))
+
+			if annos is not None: raise Exception("Got a %s paragraph after annotations began.\n\n%s" % (psty, ptext))
 
 			# Parse paragraph numbering.: If the paragraph starts immediately with a number
 			# ("(3)" or "(A)" or a sequence of such numbers) move that into a separate node.
@@ -156,7 +169,7 @@ def parse_doc_section(section, dom, state):
 
 				num = M.group(0)
 				if num.strip() == "(Signed)": break # not numbering
-				parent_node = make_node(sec, "level", None)
+				parent_node = make_node(sec, "level", None) # I think we are doing this flat (each iteration atts to sec and not recursively inside parent_node) because we infer indentation from numbering later
 				make_node(parent_node, "num", num.strip())
 				is_para_level = True
 
@@ -241,11 +254,12 @@ def parse_doc_section(section, dom, state):
 			if sec is None:
 				if context_path in (
 					"Division:I/Title:8/Subtitle:E/Chapter:21A/Subchapter:II",
-					"Division:VI/Title:38/Subtitle:III/Chapter:16"):
+					"Division:VI/Title:38/Subtitle:III/Chapter:16",
+					"Division:V/Title:31/Subtitle:IV/Chapter:38C"):
 					# allow annotations outside of a section
 					parent_node = state["stack"][-1][1]
 				else:
-					raise Exception("Not in a section.")
+					raise Exception("Not in a section. %s / %s" % (repr(ptext), context_path))
 
 			if annos is None:
 				annos = make_node(parent_node, "level", None)
