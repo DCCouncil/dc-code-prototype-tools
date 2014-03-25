@@ -26,7 +26,7 @@ def write_node(node, path, filename, backpath, toc, seen_filenames):
 	elif node.xpath("string(type)") == "Title":
 		subnodes = node.xpath("level[not(type='annotations') and not(type='Subtitle')] | level[type='Subtitle']/level[not(type='annotations')]")
 	elif node.xpath("string(type)") not in ("Section", "placeholder"):
-		subnodes = node.xpath("level[not(type='annotations')]")
+		subnodes = node.xpath("level[count(type) > 0 and not(type='annotations')]")
 	else:
 		subnodes = None
 
