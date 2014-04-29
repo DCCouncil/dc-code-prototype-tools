@@ -37,7 +37,7 @@ def write_section(node, spine, index):
 			fn = node.xpath("string(section-start)") + "~" + node.xpath("string(section-end)") + "~"
 		else:
 			raise Exception()
-	elif node.xpath("string(type)") == "Section":
+	elif node.xpath("string(type)") == "section":
 		name = node.xpath("string(num)")
 		fn = name
 
@@ -73,7 +73,7 @@ def write_section(node, spine, index):
 		f.write(lxml.etree.tostring(dom, pretty_print=True, encoding="utf-8", xml_declaration=False))
 
 def traverse_tree(node, spine, index):
-	if node.xpath("string(type)") in ("Section", "placeholder"):
+	if node.xpath("string(type)") in ("section", "placeholder"):
 		write_section(node, spine, index)
 		return
 
@@ -83,7 +83,7 @@ def traverse_tree(node, spine, index):
 				(
 					node.xpath("string(heading)"),
 					{
-						"label": node.xpath("string(type)"),
+						"label": node.xpath("string(prefix)"),
 						"identifier": node.xpath("string(num)"),
 						"order_by": str(index).zfill(10),
 						"level": str(len(spine)+1),
@@ -122,7 +122,7 @@ def render_body(node, dom, with_heading=True):
 				lvl.set("type", "table")
 			elif typ in ("annotations",):
 				continue # handled separately
-			elif typ in ("Section", "placeholder"):
+			elif typ in ("section", "placeholder"):
 				pass # nothing special for the top-level node
 			elif typ == "":
 				# paragraphs
