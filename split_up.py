@@ -22,11 +22,11 @@ def write_node(node, path, filename, backpath, toc, seen_filenames):
 	# of no interest to anyone, the numbering of titles has global scope, and it just feels
 	# like clutter.
 	if node.xpath("string(type)") == "document":
-		subnodes = node.xpath("level[type='Division']/level[type='Title']")
-	elif node.xpath("string(type)") == "Title":
-		subnodes = node.xpath("level[not(type='annotations') and not(type='Subtitle')] | level[type='Subtitle']/level[not(type='annotations')]")
-	elif node.xpath("string(type)") not in ("Section", "placeholder"):
-		subnodes = node.xpath("level[count(type) > 0 and not(type='annotations')]")
+		subnodes = node.xpath("level[prefix='Division']/level[prefix='Title']")
+	elif node.xpath("string(prefix)") == "Title":
+		subnodes = node.xpath("level[(type='toc' or type='section' or type='placeholder') and not(prefix='Subtitle')] | level[prefix='Subtitle']/level[(type='toc' or type='section' or type='placeholder')]")
+	elif node.xpath("string(type)") == "toc":
+		subnodes = node.xpath("level[(type='toc' or type='section' or type='placeholder')]")
 	else:
 		subnodes = None
 
@@ -43,13 +43,13 @@ def write_node(node, path, filename, backpath, toc, seen_filenames):
 					raise Exception()
 				sub_path = ""
 				bp = backpath
-			elif child.xpath("string(type)") == "Section":
+			elif child.xpath("string(type)") == "section":
 				fn = child.xpath("string(num)") + ".xml"
 				sub_path = ""
 				bp = backpath
 			else:
 				fn = "index.xml"
-				sub_path = clean_filename(child.xpath("string(type)") + "-" + child.xpath("string(num)")) + "/"
+				sub_path = clean_filename(child.xpath("string(prefix)") + "-" + child.xpath("string(num)")) + "/"
 				if not os.path.exists(sys.argv[1] + path + sub_path): os.mkdir(sys.argv[1] + path + sub_path)
 				bp = backpath + "../"
 
@@ -59,7 +59,7 @@ def write_node(node, path, filename, backpath, toc, seen_filenames):
 			make_node(toc_entry, "href", path + sub_path + fn)
 			for tag in ("type", "num", "section", "section-start", "section-end", "section-range-type", "heading", "reason"):
 				if child.xpath("string(%s)" % tag): make_node(toc_entry, tag, child.xpath("string(%s)" % tag))
-			if child.xpath("string(type)") not in ("Section", "placeholder"): 
+			if child.xpath("string(type)") == "toc": 
 				toc_entry_container = make_node(toc_entry, "children", None)
 			else:
 				toc_entry_container = None

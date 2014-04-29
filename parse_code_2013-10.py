@@ -329,7 +329,7 @@ def parse_doc_section(section, dom, state):
 
 			if sec is not None: do_paragraph_indentation(sec)
 			sec = make_node(state["stack"][-1][1], "level", None)
-			make_node(sec, "type", "Section")
+			make_node(sec, "type", "section")
 			make_node(sec, "num", section_number)
 			make_node(sec, "heading", section_title)
 
@@ -375,7 +375,8 @@ def parse_doc_section(section, dom, state):
 					break
 			
 			level = make_node(state["stack"][-1][1], "level", None)
-			make_node(level, "type", psty)
+			make_node(level, "type", "toc")
+			make_node(level, "prefix", psty)
 			if level_number: make_node(level, "num", level_number)
 			if level_title: make_node(level, "heading", level_title)
 			state["stack"].append( (psty, level) )
