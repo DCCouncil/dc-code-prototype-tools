@@ -134,7 +134,7 @@ def process_paragraph(para_node, handlers):
 				prtag = re.sub("^\{http://schemas.openxmlformats.org/wordprocessingml/2006/main\}", "w:", prnode.tag)
 				if prtag == "w:rPr":
 					default_run_properties.update(process_run_properties(prnode))
-				elif prtag in ("w:adjustRightInd", "w:widowControl", "w:autoSpaceDE", "w:autoSpaceDN", "w:spacing", "w:contextualSpacing"):
+				elif prtag in ("w:adjustRightInd", "w:widowControl", "w:autoSpaceDE", "w:autoSpaceDN", "w:spacing", "w:contextualSpacing", "w:shd"):
 					# Properties we really don't care about.
 					pass
 				elif prtag == "w:sectPr":
@@ -266,6 +266,8 @@ def process_run(run_node, default_run_properties, handlers):
 			text += handlers["drawing"](node)
 		elif tag == "w:pict" and "pict" in handlers:
 			text += handlers["pict"](node)
+		elif tag == "w:pgNum":
+			text += "??PAGENUM??"
 		else:
 			print("Unhandled run content node.")
 			dump(node)
@@ -285,7 +287,7 @@ def process_run_properties(node):
 		elif tag == "rStyle":
 			properties["style"] = pr.get(wpns + "val") # style name
 
-		elif tag in ("sz", "szCs", "color", "vertAlign", "bCs", "noProof", "highlight", "iCs"):
+		elif tag in ("sz", "szCs", "color", "vertAlign", "bCs", "noProof", "highlight", "iCs", "vanish"):
 			# I don't think we care. Highlight seems like maybe we should print a warning.
 			pass
 		
