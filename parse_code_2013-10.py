@@ -8,6 +8,7 @@ from worddoc import open_docx
 
 heading_case_fix = { }
 little_words = set()
+oddball_numbering = 1
 
 def main():
 	# Use the West XML to get headings in titlecase. The Lexis document has
@@ -34,7 +35,7 @@ def main():
 	dom.set("type", "document")
 	make_node(dom, "heading", "Code of the District of Columbia")
 	meta = make_node(dom, "meta", None)
-	make_node(meta, "recency", "December 13, 2013 and through D.C. Act 20-210 (except D.C. Acts 20-130, 20-157, and 20-204)")
+	make_node(meta, "recency", sys.argv[2])
 	
 	# Open the Word file. Use a cached json file if it exists
 	# since that's faster that opening the raw .docx file.
@@ -78,6 +79,8 @@ def parse_doc_section(section, dom, state):
 	# Parses the Word document, one "section" at a time. By section I mean the things
 	# between 'section breaks' in Word. Not code sections.
 
+	global oddball_numbering
+
 	sec = None
 	annos = None
 	anno_levels = None
@@ -104,9 +107,16 @@ def parse_doc_section(section, dom, state):
 			# Done!
 			break
 
+		if psty == "CodeSegment":
+			# Lexis added this later on. It nicely delineates what sort of
+			# stuff follows. The text itself is hidden normally.
+			# Unfortunately we've already coded around it.
+			if ptext in ("Statute text", "History", "Annotations"):
+				continue
+
 		# Correct mistakes in the document.
 		context_path = "/".join([n[0] + ":" + n[1].xpath("string(num)") for n in state["stack"][1:]])
-		if psty == "sectextc" and re_match("(SUBTITLE|PART|SUBPART|CHAPTER|SUBCHAPTER) [A-Za-z0-9\-]+$", ptext):
+		if psty == "sectextc" and re_match("(SUBTITLE|PART|SUBPART|CHAPTER|SUBCHAPTER|UNIT) +[A-Za-z0-9\-]+$", ptext):
 			# "PART D-i", "PART A", "PART F-i", "PART B-i", "PART XII", "SUBCHAPTER VII-E", various SUBPARTs,
 			# etc., which seems like some bad preprocessing on Lexis's side. The next paragraph is usually empty,
 			# and then the actual heading text appears. For "CHAPTER 31A1", the heading text appeared on the
@@ -149,6 +159,13 @@ def parse_doc_section(section, dom, state):
 
 		elif sec is None and ptext.strip() == "Repealed.":
 			psty = "annotations"
+
+		elif psty == "sectext" and re_match("§ (?:III|F).(?:\s*(.*))?", ptext):
+			# This looks like a Lexis screw-up.
+			psty = "Section"
+			ptext = "§ 999-%d. %s" % (oddball_numbering, M.group(1))
+			oddball_numbering += 1
+
 
 		#print(psty, ptext)
 
@@ -368,7 +385,7 @@ def parse_doc_section(section, dom, state):
 				pass
 			elif re_match("(Chapter) (11)()", ptext):
 				pass
-			elif not re_match("(Division|Subdivision|Title|Subtitle|Chapter|Subchapter|Part|Subpart|Unit|Article) ([A-Za-z0-9\-]+)\n([\w\W]*)", ptext):
+			elif not re_match("(Division|Subdivision|Title|Subtitle|Chapter|Subchapter|Part|Subpart|Unit|Article) +([A-Za-z0-9\-]+)\n([\w\W]*)", ptext):
 				raise ValueError("Invalid %s level header: %s" % (psty, ptext))
 
 			level_type, level_number, level_title = M.groups()
