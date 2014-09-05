@@ -38,13 +38,17 @@ def main():
 	
 	# Open the Word file. Use a cached json file if it exists
 	# since that's faster that opening the raw .docx file.
-	#if not os.path.exists("/tmp/doc.cache.json"):
-	doc = open_docx(sys.argv[1], pict=pict_handler)
-	#	with open("/tmp/doc.cache.json", "w") as doccache:
-	#		json.dump(doc, doccache, indent=2)
-	#else:
-	#	doc = json.load(open("/tmp/doc.cache.json"))
-	
+	fhash = hashfile(sys.argv[1])
+	doc = None
+	if os.path.exists("/tmp/doc.cache.json"):
+		fdata = json.load(open("/tmp/doc.cache.json"))
+		if fdata["hash"] == fhash:
+			doc = fdata["doc"]
+	if doc is None:
+		doc = open_docx(sys.argv[1], pict=pict_handler)
+		with open("/tmp/doc.cache.json", "w") as doccache:
+			json.dump( { "hash": fhash, "doc": doc }, doccache, indent=2)
+
 	try:
 		# Parse each section.
 		state = { "stack": None }
@@ -59,6 +63,16 @@ def main():
 
 def pict_handler(node):
 	return "@@PICT@@"
+
+def hashfile(filepath):
+    import hashlib
+    sha1 = hashlib.sha1()
+    f = open(filepath, 'rb')
+    try:
+        sha1.update(f.read())
+    finally:
+        f.close()
+    return sha1.hexdigest()
 
 def parse_doc_section(section, dom, state):
 	# Parses the Word document, one "section" at a time. By section I mean the things
