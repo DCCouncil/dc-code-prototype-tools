@@ -13,9 +13,9 @@ def main():
 	# Use the West XML to get headings in titlecase. The Lexis document has
 	# big level headings in all caps. Also get a list of words that always
 	# appear in lowercase so we can correct the remaining titles reasonably well.
-	west_dom = etree.parse(open("/home/user/data/dc_code/xml/2012-12-11.xml", "rb"))
+	west_dom = etree.parse(open("/home/user/data/dc_code/schema-2/2012-12-11.xml", "rb"))
 	is_upper_word = set()
-	for h in west_dom.xpath('//level[not(type="Section")]/heading'):
+	for h in west_dom.xpath('//level[not(type="section")]/heading'):
 		t = h.text.replace(" (Refs & Annos)", "")
 		t = re.sub("[\s\.]+$", "", t)
 		heading_case_fix[t.upper()] = t
@@ -38,12 +38,12 @@ def main():
 	
 	# Open the Word file. Use a cached json file if it exists
 	# since that's faster that opening the raw .docx file.
-	if not os.path.exists("/tmp/doc.cache.json"):
-		doc = open_docx(sys.argv[1], pict=pict_handler)
-		with open("/tmp/doc.cache.json", "w") as doccache:
-			json.dump(doc, doccache, indent=2)
-	else:
-		doc = json.load(open("/tmp/doc.cache.json"))
+	#if not os.path.exists("/tmp/doc.cache.json"):
+	doc = open_docx(sys.argv[1], pict=pict_handler)
+	#	with open("/tmp/doc.cache.json", "w") as doccache:
+	#		json.dump(doc, doccache, indent=2)
+	#else:
+	#	doc = json.load(open("/tmp/doc.cache.json"))
 	
 	try:
 		# Parse each section.
