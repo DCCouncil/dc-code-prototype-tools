@@ -177,7 +177,8 @@ def parse_section_intro_matter(section, dom, toc_location_stack):
 	# We found the parent, but we may have to create new levels.
 	for level_type, level_number, level_title in toc_location:
 		parent_node = make_node(parent_node, "level", None)
-		make_node(parent_node, "type", level_type)
+		make_node(parent_node, "type", "toc")
+		make_node(parent_node, "prefix", level_type)
 		if level_number: make_node(parent_node, "num", level_number)
 		if level_title: make_node(parent_node, "heading", level_title)
 		toc_location_stack.append( ((level_type, level_number, level_title), parent_node) )
@@ -186,7 +187,7 @@ def parse_section_intro_matter(section, dom, toc_location_stack):
 	if section_number:
 		# Make the section node.
 		sec_node = make_node(parent_node, "level", None)
-		make_node(sec_node, "type", "Section")
+		make_node(sec_node, "type", "section")
 		make_node(sec_node, "num", section_number)
 		make_node(sec_node, "heading", section_title)
 	elif placeholder_info:
@@ -200,9 +201,9 @@ def parse_section_intro_matter(section, dom, toc_location_stack):
 	else:
 		# Some parts have content directly within them. We had better not
 		# have already put nodes here, besides metadata.
-		if parent_node.xpath("*[not(name() = 'type' or name() = 'num' or name() = 'heading')]"):
+		if parent_node.xpath("*[not(name() = 'type' or name() = 'num' or name() = 'heading' or name() = 'prefix')]"):
 			raise ValueError("Adding body content to a level that already has body content or subparts.")
-		sec_node = make_node(parent_node, "chapeau", None)
+		sec_node = make_node(parent_node, "level", None)
 	
 	for fs in former_cited_as:
 		make_node(sec_node, "formerly-cited-as", fs)
