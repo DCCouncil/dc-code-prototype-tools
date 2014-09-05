@@ -11,7 +11,7 @@ ANNOTATION_HEADINGS = ("CREDIT(S)", "HISTORICAL AND STATUTORY NOTES", "UNIFORM C
 def main():
 	# Form the output dom.
 	dom = etree.Element("level")
-	make_node(dom, "type", "document")
+	dom.set( "type", "document")
 	make_node(dom, "heading", "Code of the District of Columbia")
 	meta = make_node(dom, "meta", None)
 	make_node(meta, "current-through", "2012-12-11")
@@ -177,7 +177,7 @@ def parse_section_intro_matter(section, dom, toc_location_stack):
 	# We found the parent, but we may have to create new levels.
 	for level_type, level_number, level_title in toc_location:
 		parent_node = make_node(parent_node, "level", None)
-		make_node(parent_node, "type", "toc")
+		parent_node.set("type", "toc")
 		make_node(parent_node, "prefix", level_type)
 		if level_number: make_node(parent_node, "num", level_number)
 		if level_title: make_node(parent_node, "heading", level_title)
@@ -187,12 +187,13 @@ def parse_section_intro_matter(section, dom, toc_location_stack):
 	if section_number:
 		# Make the section node.
 		sec_node = make_node(parent_node, "level", None)
-		make_node(sec_node, "type", "section")
+		sec_node.set("type", "section")
 		make_node(sec_node, "num", section_number)
 		make_node(sec_node, "heading", section_title)
 	elif placeholder_info:
-		sec_node = make_node(parent_node, "placeholder", None)
-		make_node(sec_node, "type", placeholder_info["reason"])
+		sec_node = make_node(parent_node, "level", None)
+		sec_node.set("type", "placeholder")
+		make_node(sec_node, "reason", placeholder_info["reason"])
 		make_node(sec_node, "section-start" if placeholder_info["section_end"] else "section", placeholder_info["section_start"])
 		if placeholder_info["section_end"]:
 			make_node(sec_node, "section-end", placeholder_info["section_end"])

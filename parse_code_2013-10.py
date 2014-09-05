@@ -13,7 +13,7 @@ def main():
 	# Use the West XML to get headings in titlecase. The Lexis document has
 	# big level headings in all caps. Also get a list of words that always
 	# appear in lowercase so we can correct the remaining titles reasonably well.
-	west_dom = etree.parse(open("/home/user/data/dc_code/2012-12-11.xml", "rb"))
+	west_dom = etree.parse(open("/home/user/data/dc_code/xml/2012-12-11.xml", "rb"))
 	is_upper_word = set()
 	for h in west_dom.xpath('//level[not(type="Section")]/heading'):
 		t = h.text.replace(" (Refs & Annos)", "")
@@ -31,7 +31,7 @@ def main():
 
 	# Form the output DOM.
 	dom = etree.Element("level")
-	make_node(dom, "type", "document")
+	dom.set("type", "document")
 	make_node(dom, "heading", "Code of the District of Columbia")
 	meta = make_node(dom, "meta", None)
 	make_node(meta, "recency", "December 13, 2013 and through D.C. Act 20-210 (except D.C. Acts 20-130, 20-157, and 20-204)")
@@ -68,6 +68,7 @@ def parse_doc_section(section, dom, state):
 	annos = None
 	anno_levels = None
 	cur_form_node = (None, None)
+	debug = False
 
 	for para_index, para in enumerate(section["paragraphs"]):
 		psty = para["properties"].get("style")
@@ -75,6 +76,8 @@ def parse_doc_section(section, dom, state):
 
 		ptext = para_text_content(para)
 		if ptext.strip() == "": continue
+
+		if debug: print(para)
 
 		# Skip everything until the first Division of the Code. There
 		# are some divisions before that for constitution things.
@@ -118,7 +121,7 @@ def parse_doc_section(section, dom, state):
 			# move out of annotations and into an appendices level
 			if sec is not None: do_paragraph_indentation(sec)
 			sec = make_node(sec, "level", None)
-			make_node(sec, "type", "appendices")
+			sec.set("type", "appendices")
 			make_node(sec, "heading", M.group(1))
 			annos = None
 
@@ -205,12 +208,12 @@ def parse_doc_section(section, dom, state):
 				if psty in ("form", "formc"):
 					if cur_form_node is None or cur_form_node[0] != "form":
 						cur_form_node = ("form", make_node(parent_node, "level", None))
-						make_node(cur_form_node[1], "type", "form")
+						cur_form_node[1].set( "type", "form")
 					text_parent_node = cur_form_node[1]
 				elif psty in ("table", "tablec", "PlainText"):
 					if cur_form_node is None or cur_form_node[0] != "table":
 						cur_form_node = ("table", make_node(parent_node, "level", None))
-						make_node(cur_form_node[1], "type", "table")
+						cur_form_node[1].set( "type", "table")
 					text_parent_node = cur_form_node[1]
 				else:
 					# clear state
@@ -263,7 +266,7 @@ def parse_doc_section(section, dom, state):
 
 			if annos is None:
 				annos = make_node(parent_node, "level", None)
-				make_node(annos, "type", "annotations")
+				annos.set("type", "annotations")
 				anno_levels = [(None, annos)]
 
 			if psty == "history":
@@ -297,7 +300,7 @@ def parse_doc_section(section, dom, state):
 				# This has to come before the normal section number/title line regex.
 				if sec is not None: do_paragraph_indentation(sec)
 				sec = make_node(state["stack"][-1][1], "level", None)
-				make_node(sec, "type", "placeholder")
+				sec.set("type", "placeholder")
 				if M.groupdict()["type"]: make_node(sec, "reason", M.groupdict()["type"])
 				make_node(sec, "section-start" if M.groupdict()["section_end"] else "section", M.groupdict()["section_start"])
 				if M.groupdict()["section_end"]:
@@ -312,7 +315,7 @@ def parse_doc_section(section, dom, state):
 				# This has to come before the normal section number/title line regex.
 				if sec is not None: do_paragraph_indentation(sec)
 				sec = make_node(state["stack"][-1][1], "level", None)
-				make_node(sec, "type", "placeholder")
+				sec.set("type", "placeholder")
 				make_node(sec, "reason", M.groupdict()["type"])
 				make_node(sec, "section", M.groupdict()["section_start"])
 				if M.groupdict().get("title"): make_node(sec, "heading", M.groupdict()["title"])
@@ -329,12 +332,14 @@ def parse_doc_section(section, dom, state):
 
 			if sec is not None: do_paragraph_indentation(sec)
 			sec = make_node(state["stack"][-1][1], "level", None)
-			make_node(sec, "type", "section")
+			sec.set("type", "section")
 			make_node(sec, "num", section_number)
 			make_node(sec, "heading", section_title)
 
 			annos = None
 			cur_form_node = None
+
+			#if section_number == "38-1802.09": debug = True
 
 		elif sec is None and psty in ("analysis", "analysisc"):
 			# seems to be the table of contents at the start of each level
@@ -375,7 +380,7 @@ def parse_doc_section(section, dom, state):
 					break
 			
 			level = make_node(state["stack"][-1][1], "level", None)
-			make_node(level, "type", "toc")
+			level.set("type", "toc")
 			make_node(level, "prefix", psty)
 			if level_number: make_node(level, "num", level_number)
 			if level_title: make_node(level, "heading", level_title)
