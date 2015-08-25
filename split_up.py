@@ -44,6 +44,7 @@ def write_node(node, path, filename, backpath, toc, seen_filenames):
 				sub_path = ""
 				bp = backpath
 			elif child.xpath("string(@type)") == "section":
+				print(child.xpath("string(num)"))
 				fn = child.xpath("string(num)") + ".xml"
 				sub_path = ""
 				bp = backpath
@@ -79,7 +80,7 @@ def write_node(node, path, filename, backpath, toc, seen_filenames):
 	# Write the remaining part out to disk.
 
 	fn = sys.argv[1] + path + clean_filename(filename)
-	if fn in seen_filenames: raise Exception("Sanity check failed. Two parts of the code mapped to the same file name.")
+	if fn in seen_filenames: raise Exception("Sanity check failed. Two parts of the code mapped to the same file name: {}.".format(fn))
 	seen_filenames.add(fn)
 
 	with open(fn, "wb") as f:

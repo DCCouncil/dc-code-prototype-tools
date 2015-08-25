@@ -27,6 +27,7 @@
 #                                  "b": True, # bold
 #                                  "i": True, # italic
 #                                  "u": True, # underline
+#                                  "smallCaps": True, # small caps
 #                             },
 #                             "text": "the text" # contains \n's and \t's.
 #                         }
@@ -60,7 +61,7 @@ def open_docx(fn, **handlers):
 	}
 
 def process_document_body(document, handlers):
-	if document.tag != wpns + "document": raise ValueError("Invalid document type.")
+	if document.tag != wpns + "document": raise ValueError("Invalid document type: {}; expected: {}.".format(document.tag, wpns + "document"))
 	for node in document:
 		if node.tag != wpns + "body": raise ValueError("Unexpected element.")
 		return process_paragraphs(node, handlers)
@@ -277,7 +278,7 @@ def process_run_properties(node):
 	properties = { }
 	for pr in node:
 		tag = re.sub("^\{http://schemas.openxmlformats.org/wordprocessingml/2006/main\}", "", pr.tag)
-		if tag in ("b", "i", "u"):
+		if tag in ("b", "i", "u", "smallCaps"):
 			# TODO: Are these toggle properties and what does that mean?
 			properties[tag] = (pr.get(wpns + "val", "true") == "true")
 			
