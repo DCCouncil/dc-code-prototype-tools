@@ -107,23 +107,10 @@ section_node = Matcher({
 	],
 })
 
-# section_title = TocMatcher(r'^TITLE (?P<num>[\w-]+)(\. (?P<heading>.*?)\.?)?$')
-
-# section_article = Matcher({
-# 	'properties': {'align': 'center'},
-# 	'text': [
-# 		re.compile(r'^ARTICLE (?P<num>[\w-]+)(\. (?P<heading>.*?)\.?)?$'),
-# 		re.compile(r'^article (?P<num>[\w-]+)\u2014(?P<heading>.*?)', re.IGNORECASE)
-# 	],
-# })
-
 section_heading = Matcher({
 	'properties': {'align': 'center'},
 	'text': [
 		re.compile(r'^(?P<prefix>)(?P<heading>.+)'),
-		# re.compile(r'^(?P<prefix>ARTICLE) (?P<num>[\w-]+)(\. (?P<heading>.*?)\.?)?$'),
-		# re.compile(r'^(?P<prefix>article) (?P<num>[\w-]+)\u2014(?P<heading>.*?)', re.IGNORECASE),
-		# re.compile(r'^(?P<prefix>TITLE) (?P<num>[\w-]+)(\. (?P<heading>.*?)\.?)?$')
 	],
 })
 

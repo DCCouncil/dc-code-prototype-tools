@@ -15,26 +15,6 @@ import lxml.etree as etree
 import datetime
 import matchers
 
-def either(*parser_generators):
-	"""
-	run one of the parsers. Once any parser succeeds,
-	that parser will be "locked" for the lifetime of the
-	'either' parser.
-	Parsers will be tried in the order in which they
-	are passed.
-	"""
-	def _either(dom, NextParser):
-		parsers = [parser(dom, NextParser) for parser in parser_generators]
-		def _either(para):
-			nonlocal parsers
-			for parser in parsers:
-				success = parser(para)
-				if success:
-					parsers = [parser]
-					return True
-			return False
-		return _either
-	return _either
 
 def parse_division(dom, NextParser):
 	next_parser = None
@@ -52,6 +32,7 @@ def parse_division(dom, NextParser):
 
 # we don't want repealed info in anything other than sections.
 repealed_re=re.compile(r'\. \[.*\]$')
+
 
 def ParseToc(matcher, prefix, tag='toc'):
 	"""
@@ -250,24 +231,6 @@ def _get_para_node_props(para):
 		props['text'] = _para_text_content(para, skip)
 	return props
 
-# def parse_section_heading(dom, NextParser):
-# 	next_parser = NextParser(dom)
-# 	prefix = None
-# 	def _parse_section_heading(para):
-# 		nonlocal next_parser, prefix
-# 		if matchers.section_heading(para):
-# 			match = para['text_re']
-# 			if prefix is not None:
-# 				prefix = match.group('prefix')
-# 			elif prefix == match.group('prefix'):
-# 				heading_node = _make_level(dom, **match.groupdict())
-# 				next_parser = parse_section_nodes(heading_node, NextParser)
-# 				return True
-# 			else:
-# 				return next_parser(para)
-# 		else:
-# 			return next_parser(para)
-# 	return _parse_section_heading
 
 parens_re = re.compile(r'(?P<num>\([\w-]+\))')
 
@@ -332,7 +295,6 @@ def parse_section_nodes(dom, NextParser):
 			return False
 	return _parse_section_nodes
 
-# parse_section_nodes = either(parse_section_heading, parse_section_paras)
 
 def parse_anno(dom, NextParser):
 	anno_node = None
@@ -351,47 +313,6 @@ def parse_anno(dom, NextParser):
 	return _parse_anno
 
 
-# def in_order(*parser_generators):
-# 	"""
-# 	run each parser in order; subsequent parsers cannot 
-# 	match until previous parsers match then fail.
-# 	"""
-# 	pass
-
-
-# def at_most_once(*parser_generators):
-# 	"""
-# 	given a list of different parsers,
-# 	allow each one to match paras at least once.
-# 	A parser in considered done, and won't be
-# 	allowed to parse again, when it returns False.
-# 	"""
-# 	def _at_most_once(dom, NextParser):
-# 		parsers = {
-# 			"unmatched": [parser(dom, NextParser) for parser in parser_generators],
-# 			"matched": [],
-# 			"current": None,
-# 		}
-# 		def _at_most_once(para):
-# 			if parsers['current']:
-# 				successful = parsers['current'](para)
-# 				if successful :
-# 					return True
-# 				elif not para['text']:
-# 					return False
-# 				else:
-# 					parsers['matched'].append(parsers['current'])
-# 					parsers['unmatched'].remove(parsers['current'])
-# 					parsers['current'] = None
-# 			for parser in parsers['unmatched']:
-# 				successful = parser(para)
-# 				if successful:
-# 					parsers['current'] = parser
-# 					return True
-# 			return False
-# 		return _at_most_once
-# 	return _at_most_once
-
 def pipeline(*parsers, i=0):
 	next_parser = None
 	def _next_parser(dom, NextParser=None):
@@ -406,13 +327,6 @@ def pipeline(*parsers, i=0):
 			else:
 				return lambda para: False
 	return _next_parser
-
-# def pipeline(*parsers):
-# 	def _pipeline(dom, NextParser=None):
-# 		if NextParser:
-# 			parsers.append(NextParser)
-# 		return next_parser(*parsers)
-# 	return _pipelinev
 
 def _make_node(parent, tag, text, **attrs):
 	""" Make a node in an XML document. """
@@ -479,11 +393,6 @@ def _prepend(prepend_text, run=0):
 
 def _ignore(para):
 	return True
-
-def set_level(level):
-	def _set_level(para):
-		para['lvl'] = level
-		return False
 
 def _merge(old, new):
 	if matchers.isdict(old) and matchers.isdict(new):
