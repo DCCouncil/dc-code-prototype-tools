@@ -40,16 +40,16 @@ def TocMatcher(regex):
 		'text': re.compile(regex),
 	})
 
-division =    TocMatcher(r'^Division (?P<num>[\w-]+)\. (?P<heading>.+)\.')
-title =       TocMatcher(r'^Title (?P<num>[\w-]+)\. (?P<heading>.+)\.')
-unit =        TocMatcher(r'^Unit (?P<num>[\w-]+)\. (?P<heading>.+)\.')
-subtitle =    TocMatcher(r'^Subtitle (?P<num>[\w-]+)\. (?P<heading>.+)\.')
-subdivision = TocMatcher(r'^Subdivision (?P<num>[\w-]+)\. (?P<heading>.+)\.')
-article =     TocMatcher(r'^Article (?P<num>[\w-]+)\. (?P<heading>.+)\.')
-chapter =     TocMatcher(r'^Chapter (?P<num>[\w-]+)\. (?P<heading>.+)\.')
-subchapter =  TocMatcher(r'^Subchapter (?P<num>[\w-]+)\. (?P<heading>.+)\.')
-part =        TocMatcher(r'^Part (?P<num>[\w-]+)\. (?P<heading>.+)\.')
-subpart =     TocMatcher(r'^Subpart (?P<num>[\w-]+)\.? (?P<heading>.+?)\.?$')
+division =    TocMatcher(r'^Division (?P<num>[\w-]+)\. (?P<heading>.+)')
+title =       TocMatcher(r'^Title (?P<num>[\w-]+)\. (?P<heading>.+)')
+unit =        TocMatcher(r'^Unit (?P<num>[\w-]+)\. (?P<heading>.+)')
+subtitle =    TocMatcher(r'^Subtitle (?P<num>[\w-]+)\. (?P<heading>.+)')
+subdivision = TocMatcher(r'^Subdivision (?P<num>[\w-]+)\. (?P<heading>.+)')
+article =     TocMatcher(r'^Article (?P<num>[\w-]+)\. (?P<heading>.+)')
+chapter =     TocMatcher(r'^Chapter (?P<num>[\w-]+)\. (?P<heading>.+)')
+subchapter =  TocMatcher(r'^Subchapter (?P<num>[\w-]+)\. (?P<heading>.+)')
+part =        TocMatcher(r'^Part (?P<num>[\w-]+)\. (?P<heading>.+)')
+subpart =     TocMatcher(r'^Subpart (?P<num>[\w-]+)\.? (?P<heading>.+)')
 
 
 history = Matcher({
@@ -63,15 +63,15 @@ placeholder = Matcher({
 	'properties': {'style': 'Title'},
 	'text': [
 		# TODO: handle comma-separated multiple sections (title 22+)
-		re.compile(r'\u00a7\u00a7 (?P<section_start>[:.\w-]+) to (?P<section_end>[:.\w-]+)\.( (?P<heading>.+)\. )?\[(?P<reason>[^\[]+)\]\.'),
-		re.compile(r'\u00a7\u00a7 (?P<section_start>[:.\w-]+) to (?P<section_end>[:.\w-]+)\.( (?P<heading>.+)\.)?'),
-		re.compile(r'^\u00a7 (?P<section>[:.\w-]+)\.( (?P<heading>.+)\. )?\[(?P<reason>[^\[]+)\].'),
+		re.compile(r'\u00a7\u00a7 (?P<section_start>[:.\w-]+) to (?P<section_end>[:.\w-]+)\.( (?P<heading>.+) )?\[(?P<reason>[^\[]+)\]\.'),
+		re.compile(r'\u00a7\u00a7 (?P<section_start>[:.\w-]+) to (?P<section_end>[:.\w-]+)\.( (?P<heading>.+))?'),
+		re.compile(r'^\u00a7 (?P<section>[:.\w-]+)\.( (?P<heading>.+) )?\[(?P<reason>[^\[]+)\].'),
 	]
 })
 
 section = Matcher({
 	'properties': {'style': 'Title'},
-	'text': re.compile(r'^\u00a7 (?P<num>[:.\w-]+)\.( (?P<heading>.+).)?'),
+	'text': re.compile(r'^\u00a7 (?P<num>[:.\w-]+)\.( (?P<heading>.+))?'),
 })
 
 toc_entry = Matcher({
@@ -102,7 +102,7 @@ section_node = Matcher({
 		},
 		optional({
 			'properties': {'i': True},
-			'text': re.compile(r'^(?P<heading>.+?)\.? ?\u2014?\s*$'),
+			'text': re.compile(r'^(?P<heading>.+?)\s*$'),
 		})
 	],
 })

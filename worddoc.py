@@ -112,11 +112,11 @@ def process_paragraphs(node, handlers):
 				# This table has no text content so it is safe to skip.
 				# I hope!
 				continue
-			print("Tables are not implemented.")
+			print("Tables are not implemented.", file=sys.stderr)
 			dump(pnode)
 
 		else:
-			print("Unhandled body node.")
+			print("Unhandled body node.", file=sys.stderr)
 			dump(pnode)
 			
 	return sections
@@ -165,7 +165,7 @@ def process_paragraph(para_node, handlers):
 						if ts.tag == wpns + "tab":
 							properties["tabs"].append(int(ts.get(wpns + "pos", "0")))
 				else:
-					print("Unhandled paragraph properties node.")
+					print("Unhandled paragraph properties node.", file=sys.stderr)
 					dump(prnode)
 		elif tag in ("w:bookmarkStart", "w:bookmarkEnd", "w:proofErr"):
 			# Nothing interesting.
@@ -188,7 +188,7 @@ def process_paragraph(para_node, handlers):
 			else:
 				runs.append(run)
 		else:
-			print("Unhandled paragraph content node:", tag)
+			print("Unhandled paragraph content node:", tag, file=sys.stderr)
 			dump(node)
 
 	return {
@@ -270,7 +270,7 @@ def process_run(run_node, default_run_properties, handlers):
 		elif tag == "w:pgNum":
 			text += "??PAGENUM??"
 		else:
-			print("Unhandled run content node.")
+			print("Unhandled run content node.", file=sys.stderr)
 			dump(node)
 	return { "text": text, "properties": properties }
 	
@@ -297,7 +297,7 @@ def process_run_properties(node):
 			pass
 
 		else:
-			print("Unhandled run properties node.")
+			print("Unhandled run properties node.", file=sys.stderr)
 			dump(pr)
 	return properties
 	
@@ -322,7 +322,7 @@ def process_section_properties(node):
 			pass
 
 		else:
-			print("Unhandled section properties node.")
+			print("Unhandled section properties node.", file=sys.stderr)
 			dump(pr)
 	return properties
 	
@@ -334,4 +334,4 @@ def dump(node):
 	elem[:] = node
 	node = elem
 	
-	print(lxml.etree.tostring(node, pretty_print=True, encoding=str))
+	print(lxml.etree.tostring(node, pretty_print=True, encoding=str), file=sys.stderr)

@@ -162,7 +162,7 @@ def parse_section(parse_text_generator, parse_history_generator, parse_anno_gene
 				return True
 			elif section_node is not None and (parse_history(para) or parse_anno(para)):
 				in_text = False
-				dom.append(anno_node)
+				section_node.append(anno_node)
 				return True
 			elif in_text and parse_text(para):
 				return True
