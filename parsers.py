@@ -221,6 +221,12 @@ def _get_para_node_props(para):
 		except:
 			pass
 
+		# gotta check if heading is the last node in the run. because lexis.
+		if para.get('runs', [{}])[-1].get('properties', {}).get('i'):
+			heading_para = para['runs'].pop()
+			para['runs'].insert(1, heading_para)
+			matchers.section_node(para)
+
 		try:
 			heading_match = para['runs'][1]['text_re']
 		except(IndexError, KeyError):
@@ -230,6 +236,17 @@ def _get_para_node_props(para):
 			props['heading'] = heading_match.group('heading')
 		props['text'] = _para_text_content(para, skip)
 	return props
+
+
+def _get_next_level(para):
+	""" return the next para level, or none if there is no next para """
+	while True:
+		para = para['next']()
+		if para is None or matchers.history(para):
+			return None
+		props = _get_para_node_props(para)
+		if props:
+			return props['indent']
 
 
 parens_re = re.compile(r'(?P<num>\([\w-]+\))')
@@ -242,8 +259,9 @@ def parse_section_nodes(dom, NextParser):
 	next_parser = None
 	level = None
 	in_child = False
+	para_node = None
 	def _parse_section_nodes(para):
-		nonlocal next_parser, level, in_child
+		nonlocal next_parser, level, in_child, para_node
 		props = _get_para_node_props(para)
 		if props:
 			if level is None:
@@ -277,7 +295,7 @@ def parse_section_nodes(dom, NextParser):
 			if level == match.group('prefix'):
 				heading_node = _make_level(dom, **match.groupdict())
 				next_parser = parse_section_nodes(heading_node, NextParser)
-				in_child = False
+				in_child = True
 				return True
 			else:
 				success = next_parser(para)
@@ -287,7 +305,12 @@ def parse_section_nodes(dom, NextParser):
 			if in_child and next_parser(para):
 				return True
 			elif not matchers.centered(para):
-				_make_text(dom, para['text'], para=para['index'])
+				# lookahead to determine if text belongs to node or its parent
+				next_level = _get_next_level(para)
+				if para_node is not None and next_level and (not matchers.isint(level) or next_level >= level):
+					_make_text(para_node, para['text'], para=para['index'])
+				else:
+					_make_text(dom, para['text'], para=para['index'])
 				return True
 			else:
 				return False
@@ -365,14 +388,14 @@ def _make_placeholder(parent, reason=None, heading=None, section=None, section_s
 	level = _make_node(parent, 'level', None, type='placeholder', para=para)
 	if reason:
 		_make_node(level, 'reason', reason)
-	if heading:
-		_make_node(level, 'heading', heading)
 	if section:
 		_make_node(level, 'section', section)
 	if section_start:
 		_make_node(level, 'section-start', section_start)
 		_make_node(level, 'section-end', section_end)
 		_make_node(level, 'section-range-type', 'range')
+	if heading:
+		_make_node(level, 'heading', heading)
 	return level
 
 def _make_text(parent, text=None, para=None, **kwargs):
@@ -393,6 +416,12 @@ def _prepend(prepend_text, run=0):
 
 def _ignore(para):
 	return True
+
+def _move_run(old_index, new_index):
+	def _move_run(para):
+		para['runs'].insert(new_index, para['runs'].pop(old_index))
+		return para
+	return _move_run
 
 def _merge(old, new):
 	if matchers.isdict(old) and matchers.isdict(new):
@@ -428,111 +457,115 @@ def bulk_apply(fix_fns, fn, start, end):
 fix_fns = {
 	0: _ignore,
 
-	# div 1
 	# 2015-06
+	# div 1
+	175: _move_run(-1, 1),
+	178: _move_run(-1, 1),
+	181: _move_run(-1, 1),
+	190: _move_run(-1, 1),
 	# 1-325.331
 	16337: _prepend('\u00a7 '),
 	# 1-623.02 TODO: fix
 	31392: _update({'ignore': True}),
-	37528: _update({'properties': {'align': None}}),
+	37528+1: _update({'properties': {'align': None}}),
 	# 2-1223.21
-	74384: _update({'runs': [{'text': '\u00a7 2-1223.21. Corporation’s review of plans and projects of District agencies. [Repealed].'}]}),
-	77380: _update({'properties': {'align': 'center'}}),
-	85972: _ignore,
-	86018: _update({'properties': {'align': 'center'}}),
-	129359: _update({'runs': [{'text': '§ 5-1051. Definitions.'}]}),
+	74384+1: _update({'runs': [{'text': '\u00a7 2-1223.21. Corporation’s review of plans and projects of District agencies. [Repealed].'}]}),
+	77380+1: _update({'properties': {'align': 'center'}}),
+	85972+1: _ignore,
+	86018+1: _update({'properties': {'align': 'center'}}),
+	129359+4: _update({'runs': [{'text': '§ 5-1051. Definitions.'}]}),
 
 	# # div 2
-	210564 + 0: _ignore,
-	223257: _update({'runs': [{'text': "\u00a7 16-916.01a. \u2014 Appendices to \u00a7\u200216-916.01."}]}),
-	210564 + 21850: _update({'history': False}),
-	210564 + 26674: _update({'history': False}),
+	210569 + 0: _ignore,
+	210569 + 12693: _update({'runs': [{'text': "\u00a7 16-916.01a. \u2014 Appendices to \u00a7\u200216-916.01."}]}),
+	210569 + 21850: _update({'history': False}),
+	210569 + 26674: _update({'history': False}),
 
 	# # div 3
-	237532 + 0: _ignore,
-	237532 + 2421: _update({'history': False}),
-	237532 + 2494: _update({'history': False}),
-	237532 + 2881: _update({'history': False}),
-	237532 + 3172: _update({'history': False}),
-	237532 + 7010: _update({'history': False}),
+	237537 + 0: _ignore,
+	237537 + 2421: _update({'history': False}),
+	237537 + 2494: _update({'history': False}),
+	237537 + 2881: _update({'history': False}),
+	237537 + 3172: _update({'history': False}),
+	237537 + 7010: _update({'history': False}),
 
 	# div 4
-	254878 + 0: _ignore,
-	254878 + 12072: _update({'runs': [{'text': '\u00a7\u00a7 22-3801 to 22-3802. Indecent acts with children; sodomy. [Repealed].'}]}),
-	254878 + 15136: _update({'runs': [{'text': '\u00a7\u00a7 22-4901 to 22-4902. Seduction; seduction by teacher. [Repealed].'}]}),
+	254883 + 0: _ignore,
+	254883 + 12072: _update({'runs': [{'text': '\u00a7\u00a7 22-3801 to 22-3802. Indecent acts with children; sodomy. [Repealed].'}]}),
+	254883 + 15136: _update({'runs': [{'text': '\u00a7\u00a7 22-4901 to 22-4902. Seduction; seduction by teacher. [Repealed].'}]}),
 
 
 	# # div 5
 	# # article 4; part 1
-	280835 + 0: _ignore,
+	280849 + 0: _ignore,
 
-	280835 + 28207: _update({'runs': [{'text': 'Part 1. General Provisions and Definitions.'}]}),
-	280835 + 28208: _ignore,
+	280849 + 28207 + 4: _update({'runs': [{'text': 'Part 1. General Provisions and Definitions.'}]}),
+	280849 + 28208 + 4: _ignore,
 	# article 4A; part 1
-	280835 + 29593: _update({'runs': [{'text': 'Part 1. Subject Matter and Definitions.'}]}),
-	280835 + 29594: _ignore,
+	280849 + 29593 + 4: _update({'runs': [{'text': 'Part 1. Subject Matter and Definitions.'}]}),
+	280849 + 29594 + 4: _ignore,
 
-	280835 + 32390: _update({'runs': [{'text': 'Part 1. General.'}]}),
-	280835 + 32391: _ignore,
-	280835 + 45738: _prepend(' '),
-	280835 + 46257: _update({'properties': {"align": "center"}}),
-	280835 + 65827: _prepend('    '),
-	280835 + 65829: _prepend('    '),
-	280835 + 65831: _prepend('    '),
-	280835 + 65833: _prepend('    '),
+	280849 + 32390 + 4: _update({'runs': [{'text': 'Part 1. General.'}]}),
+	280849 + 32391 + 4: _ignore,
+	280849 + 45738 + 4: _prepend(' '),
+	280849 + 46257 + 4: _update({'properties': {"align": "center"}}),
+	280849 + 65827 + 4: _prepend('    '),
+	280849 + 65829 + 4: _prepend('    '),
+	280849 + 65831 + 4: _prepend('    '),
+	280849 + 65833 + 4: _prepend('    '),
 
 	# NOTE: moved 356337 to its proper place just after 356317
-	280835 + 75502: _prepend('    '),
+	280849 + 75502 + 4: _prepend('    '),
 
 	# NOTE: moved 356500-356502 to proper place just after 356460
-	280835 + 75665: _prepend('    '),
-	280835 + 75667: _prepend('    '),
+	280849 + 75665 + 4: _prepend('    '),
+	280849 + 75667 + 4: _prepend('    '),
 
-	280835 + 104829: _update({'runs': [{'text': "\u00a7 31-3171.01. Definitions."}]}),
-	280835 + 125196: _update({'runs': [{'text': '\u00a7\u00a7 31-5901 to 31-5902. Required licenses for agents or brokers; compensation to unlicensed agents prohibited; violations; exemption of fraternal associations from provisions; licenses required for authorized solicitors; assignment of licenses; violations. [Repealed].'}]}),
-	280835 + 133605: _update({ "runs": [{"properties": {"b": True }, "text": "    (1) " }, {"text": "    Repealed."} ]}),
-	280835 + 133606: _update({ "runs": [{"properties": {"b": True }, "text": "    (2) " }, {"text": "    Repealed."} ]}),
-	280835 + 151597: _prepend('  '),
-	280835 + 153038: _update({ "runs": [{'properties': {'b': True}, 'text': '  (a) '}, { "properties": { "font": "Calibri" }, "text": "If a public utility proposes an action, it shall prepare and transmit to the Commission a detailed environmental impact statement within 60 days following the submission of the proposal. The environmental impact statement shall describe in detail the proposed action, the necessity for the proposed action, and a brief discussion of the following factors:" } ]}),
+	280849 + 104829 + 6: _update({'runs': [{'text': "\u00a7 31-3171.01. Definitions."}]}),
+	280849 + 125196 + 10: _update({'runs': [{'text': '\u00a7\u00a7 31-5901 to 31-5902. Required licenses for agents or brokers; compensation to unlicensed agents prohibited; violations; exemption of fraternal associations from provisions; licenses required for authorized solicitors; assignment of licenses; violations. [Repealed].'}]}),
+	280849 + 133605 + 10: _update({ "runs": [{"properties": {"b": True }, "text": "    (1) " }, {"text": "    Repealed."} ]}),
+	280849 + 133606 + 10: _update({ "runs": [{"properties": {"b": True }, "text": "    (2) " }, {"text": "    Repealed."} ]}),
+	280849 + 151597 + 10: _prepend('  '),
+	280849 + 153038 + 10: _update({ "runs": [{'properties': {'b': True}, 'text': '  (a) '}, { "properties": { "font": "Calibri" }, "text": "If a public utility proposes an action, it shall prepare and transmit to the Commission a detailed environmental impact statement within 60 days following the submission of the proposal. The environmental impact statement shall describe in detail the proposed action, the necessity for the proposed action, and a brief discussion of the following factors:" } ]}),
 
 	# div 6
-	438123 + 0: _ignore,
-	438123 + 11156: _ignore,
-	438123 + 25389: _update({'article': False}),
-	438123 + 25405: _update({'article': False}),
-	438123 + 25408: _update({'article': False}),
-	438123 + 25430: _update({'article': False}),
-	438123 + 25445: _update({'article': False}),
-	438123 + 25451: _update({'article': False}),
-	438123 + 25459: _update({'article': False}),
-	438123 + 25473: _update({'article': False}),
-	438123 + 25483: _update({'article': False}),
+	438147 + 0: _ignore,
+	438147 + 11156: _ignore,
+	438147 + 25389 + 6: _update({'article': False}),
+	438147 + 25405 + 6: _update({'article': False}),
+	438147 + 25408 + 6: _update({'article': False}),
+	438147 + 25430 + 6: _update({'article': False}),
+	438147 + 25445 + 6: _update({'article': False}),
+	438147 + 25451 + 6: _update({'article': False}),
+	438147 + 25459 + 6: _update({'article': False}),
+	438147 + 25473 + 6: _update({'article': False}),
+	438147 + 25483 + 6: _update({'article': False}),
 
 	# div 7
-	465398: _ignore,
-	465398 + 2787: _update({'history': False}),
-	465398 + 2803: _update({'history': False}),
-	465398 + 2819: _update({'history': False}),
-	465398 + 2835: _update({'history': False}),
-	465398 + 10200: _update({'history': False}),
-	465398 + 30328: _update({"runs": [{"text": "\u00a7\u00a7 42-4071 to 42-4072. [Expired]."}]}),
+	465428: _ignore,
+	465428 + 2787: _update({'history': False}),
+	465428 + 2803: _update({'history': False}),
+	465428 + 2819: _update({'history': False}),
+	465428 + 2835: _update({'history': False}),
+	465428 + 10200: _update({'history': False}),
+	465428 + 30328: _update({"runs": [{"text": "\u00a7\u00a7 42-4071 to 42-4072. [Expired]."}]}),
 
 	# div 8
-	495761: _ignore,
-	495761 + 29174: _update({'article': False}),
-	495761 + 29185: _update({'article': False}),
-	495761 + 29205: _update({'article': False}),
-	495761 + 29208: _update({'article': False}),
-	495761 + 29211: _update({'article': False}),
-	495761 + 29223: _update({'article': False}),
-	495761 + 29288: _update({'article': False}),
-	495761 + 29300: _update({'article': False}),
-	495761 + 29320: _update({'article': False}),
-	495761 + 29326: _update({'article': False}),
-	495761 + 29337: _update({'article': False}),
-	588062: _update({'runs': [{'text': '\u00a7 50-301.01. Findings.'}]}),
-	588118: _update({'runs': [{'text': '\u00a7 50-301.02. Purposes.'}]}),
-	588330: _update({'runs': [{'text': '\u00a7 50-301.04. District of Columbia Taxicab Commission \u2014 Established.'}]}),
+	495791 + 0: _ignore,
+	495791 + 29174: _update({'article': False}),
+	495791 + 29185: _update({'article': False}),
+	495791 + 29205: _update({'article': False}),
+	495791 + 29208: _update({'article': False}),
+	495791 + 29211: _update({'article': False}),
+	495791 + 29223: _update({'article': False}),
+	495791 + 29288: _update({'article': False}),
+	495791 + 29300: _update({'article': False}),
+	495791 + 29320: _update({'article': False}),
+	495791 + 29326: _update({'article': False}),
+	495791 + 29337: _update({'article': False}),
+	495791 + 92301 + 13: _update({'runs': [{'text': '\u00a7 50-301.01. Findings.'}]}),
+	495791 + 92357 + 13: _update({'runs': [{'text': '\u00a7 50-301.02. Purposes.'}]}),
+	495791 + 92569 + 13: _update({'runs': [{'text': '\u00a7 50-301.04. District of Columbia Taxicab Commission \u2014 Established.'}]}),
 
 }
 

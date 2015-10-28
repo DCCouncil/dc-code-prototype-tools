@@ -41,6 +41,7 @@
 import zipfile, lxml.etree, re
 from math import floor
 from copy import deepcopy
+import sys
 
 wpns = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 	
@@ -112,8 +113,12 @@ def process_paragraphs(node, handlers):
 				# This table has no text content so it is safe to skip.
 				# I hope!
 				continue
+			sections[-1]['paragraphs'].append({
+				"properties": {},
+				"runs": [{"properties": {}, "text": "@@TABLE@@"}]
+			})
 			print("Tables are not implemented.", file=sys.stderr)
-			dump(pnode)
+			# dump(pnode)
 
 		else:
 			print("Unhandled body node.", file=sys.stderr)
@@ -148,6 +153,16 @@ def process_paragraph(para_node, handlers):
 				elif prtag == "w:textAlignment" and prnode.get(wpns + "val") == "auto":
 					# this is vertical alignment; don't care
 					pass
+				elif prtag == "w:keepLines" or prtag == "w:keepNext":
+					# this is when to force content to new pages
+					pass
+				elif prtag == "w:outlineLvl":
+					properties['outlineLvl'] = prnode.get(wpns + "val") # outline level
+				elif prtag == "w:numPr":
+					properties["num"] = {
+						"ilvl": prnode.getchildren()[0].get(wpns + 'val'),
+						"numId": prnode.getchildren()[1].get(wpns + 'val'),
+					}
 				elif prtag == "w:pStyle":
 					properties['style'] = prnode.get(wpns + "val")
 				elif prtag == "w:framePr":
@@ -278,7 +293,7 @@ def process_run_properties(node):
 	properties = { }
 	for pr in node:
 		tag = re.sub("^\{http://schemas.openxmlformats.org/wordprocessingml/2006/main\}", "", pr.tag)
-		if tag in ("b", "i", "u", "smallCaps"):
+		if tag in ("b", "i", "u", "smallCaps", "caps", "strike"):
 			# TODO: Are these toggle properties and what does that mean?
 			properties[tag] = (pr.get(wpns + "val", "true") == "true")
 			
@@ -296,6 +311,8 @@ def process_run_properties(node):
 			# don't care if we're setting language to English
 			pass
 
+		elif tag == "spacing":
+			properties["spacing"] = pr.get(wpns + "val")
 		else:
 			print("Unhandled run properties node.", file=sys.stderr)
 			dump(pr)

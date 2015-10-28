@@ -44,7 +44,7 @@ def write_node(node, path, filename, backpath, toc, seen_filenames):
 				sub_path = ""
 				bp = backpath
 			elif child.xpath("string(@type)") == "section":
-				print(child.xpath("string(num)"))
+				# print(child.xpath("string(num)"))
 				fn = child.xpath("string(num)") + ".xml"
 				sub_path = ""
 				bp = backpath

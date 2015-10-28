@@ -2,6 +2,8 @@ import os, os.path, sys, json, time, re
 import lxml.etree as etree
 from parsers import Parser, _make_node, _para_text_content
 from worddoc import open_docx
+import matchers
+import copy
 
 div_re = re.compile(r'(?P<div>\w+)\.docx$')
 
@@ -14,6 +16,10 @@ def parse_file(dom, path_to_file, start_para_index):
 	tmp_doc = "/tmp/doc.cache.{}.json".format(fhash)
 	if os.path.exists(tmp_doc):
 		doc = json.load(open(tmp_doc))
+		print('loading from', tmp_doc, file=sys.stderr)
+	else:
+		print('saving to', tmp_doc, file=sys.stderr)
+
 	if doc is None:
 		doc = open_docx(path_to_file, pict=pict_handler)
 		div_re.search('./2015-06/Division VIII.docx').group('div')
@@ -59,6 +65,7 @@ def main():
 def pict_handler(node):
 	return "@@PICT@@"
 
+def 
 def _hashfile(filepath):
     import hashlib
     sha1 = hashlib.sha1()
@@ -71,12 +78,26 @@ def _hashfile(filepath):
 
 
 def parse_doc_section(section, dom):
+	def prep_para(para):
+		para['text'] = _para_text_content(para)
+		def next_para():
+			paras = section['paragraphs']
+			next_index = para['index'] - paras[0]['index'] + 1
+			if next_index >= len(paras):
+				return None
+			next_p = prep_para(copy.deepcopy(paras[next_index]))
+			if matchers.empty(next_p):
+				next_p = next_p['next']()
+			return next_p
+		para['next'] = next_para;
+		return para
+
 	parser = Parser(dom)
 
 	unhandled_count = 0
 	handled_count = 0
 	for para in section["paragraphs"]:
-		para['text'] = _para_text_content(para)
+		prep_para(para)
 		if not para['text']:
 			continue
 		success = parser(para)
@@ -87,6 +108,7 @@ def parse_doc_section(section, dom):
 			handled_count += 1
 	print('handled paras: {}'.format(handled_count), file=sys.stderr)
 	print('unhandled paras: {}'.format(unhandled_count), file=sys.stderr)
+
 
 if __name__ == '__main__':
 	main()
