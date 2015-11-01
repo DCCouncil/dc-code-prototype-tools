@@ -29,9 +29,12 @@ class optional(object):
 	def __eq__(self, other):
 		return self.pattern == other
 
-def Matcher(pattern):
+def Matcher(*patterns):
 	def _matcher(obj):
-		return match(pattern, obj)
+		for pattern in patterns:
+			if match(pattern, obj):
+				return True
+		return False
 	return _matcher
 
 def TocMatcher(regex):
@@ -118,6 +121,7 @@ anno = Matcher({
 	'properties': {'style': 'Subtitle'},
 	'text': re.compile(r'^(?P<heading>[^.]+)')
 })
+
 
 #################################
 
@@ -211,6 +215,8 @@ def match(pattern, obj, is_child=False, **kwargs):
 				if match_result:
 					regex['obj'][key] = match_result
 					break
+				elif key in regex['obj']:
+					del(regex['obj'][key])
 			if key not in regex['obj'] and not regex['optional']:
 				return False
 		return True
