@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 # Convert a DC Council Statute at Large file, for a single statute
 # entry, into XML.
 #
@@ -14,6 +16,8 @@
 import sys, re, lxml.etree as etree, datetime, json
 from worddoc import open_docx
 from matchers import Matcher, isint
+
+errors = 0
 
 class Para(dict):
 	def __init__(self, paras, para=None):
@@ -153,13 +157,16 @@ def _get_short_title_para(para):
 
 short_title_re = re.compile(r'(\u201c|")(?P<short_title>.*?)(\u201d|")')
 def header(dom, para, next_parser):
+	global errors
 	make_node(dom, 'act-header', para['text'])
 	para = para.next(skip=3)
 	make_node(dom, 'long-title', para['text'])
 	make_node(dom, 'short-title', short_title_re.search(_get_short_title_para(para)['text']).group('short_title'))
-	body = make_node(dom, 'body')
-	para = next_parser(body, para.next())
-	return para
+	next_parser(dom, para.next())
+
+	if errors:
+		dom.attrib['errors'] = str(errors)
+	errors = 0
 
 def toc(dom, para, next_parser):
 	toc_dom = []
@@ -175,12 +182,37 @@ def toc(dom, para, next_parser):
 		style = next_para.get('properties', {}).get('style', '')
 		para = next_para
 
-	next_parser(dom, para)
+	body = make_node(dom, 'body')
+	next_parser(body, para)
 	
 def short_title(dom, para, next_parser):
 	para = _get_short_title_para(para)
 	make_node(dom, 'text', text=para['text'])
 	next_parser(dom, para.next())
+
+def is_container(prefix):
+	return Matcher({
+			'text': re.compile(r'^(?P<prefix>{}) (?P<num>[\w-]+\.) (?P<heading>.+)'.format(prefix), re.I),
+		})
+
+is_any_container = Matcher({
+	'text': re.compile(r'^(?P<prefix>(division|title|subtitle|article|subdivision|chapter|subchapter|part|subpart)) (?P<num>[\w-]+\.) (?P<heading>.+)', re.I),
+})
+
+def _container(dom, para, next_parser):
+	if is_any_container(para):
+		_is_container = is_container(para['text_re'].group('prefix'))
+		container_paras = para.split(_is_container)
+		for container_para in container_paras:
+			_is_container(container_para)
+			container_dom = make_container(dom, **container_para['text_re'].groupdict())
+			next_para = container_para.next()
+			if is_any_container(next_para):
+				_container(container_dom, next_para, next_parser)
+			else:
+				next_parser(container_dom, next_para)
+	else:
+		next_parser(dom, para)
 
 is_title = Matcher({
 	'properties': {'outlineLvl': '0'},
@@ -218,13 +250,14 @@ def subtitle(dom, para, next_parser):
 	else:
 		next_parser(dom, para)
 
-is_section = Matcher({'text': re.compile(r'Sec(,|\.) ?(?P<num>[\w-]+)\.? (?P<heading>[^\(][^.]+\.(\s|$))?(?P<remainder>.*)')})
+detect_section = Matcher({'text': re.compile(r'^Sec[,. ;/):-]')})
+is_section = Matcher({'text': re.compile(r'^(\u00a7|Sec\.) (?P<num>[\w.-]+)\. (?P<heading>[^\(][^.]+\.(\s|$))?(?P<remainder>.*)')})
 
 def _section(dom, para, next_parser):
-	section_paras = para.split(is_section)
+	section_paras = para.split(detect_section)
 	for section_para in section_paras:
 		if not is_section(section_para):
-			make_node(dom, 'error', section_para['text'])
+			make_error(dom, section_para)
 			return
 		re_sults = section_para['text_re'].groupdict()
 		section_dom = make_section(dom, **re_sults)
@@ -254,7 +287,7 @@ is_any_para = is_para()
 
 def _para(dom, para, next_parser):
 	if not is_any_para(para):
-		make_node(dom, 'error', para['text'])
+		make_error(dom, para)
 		return
 	run = para['runs'][0]['text']
 	indent = para['properties'].get('indentation', len(run) - len(run.lstrip(' ')))
@@ -263,7 +296,7 @@ def _para(dom, para, next_parser):
 
 	for para_para in para_paras:
 		if not _is_para(para):
-			make_node(dom, 'error', para['text'])
+			make_error(dom, para)
 			return
 		re_sults = para_para['text_re'].groupdict()
 		para_dom = make_para(dom, **re_sults)
@@ -274,7 +307,10 @@ def _para(dom, para, next_parser):
 		else:
 			next_para = para_para.next()
 		if next_para:
-			next_parser(para_dom, next_para)
+			if is_any_para(next_para):
+				para_parser(para_dom, next_para, next_parser)
+			else:
+				next_parser(para_dom, next_para)
 
 def is_include(para):
 	text = para['text'].replace('\u201c', '"').replace('\u201d', '"')
@@ -289,7 +325,7 @@ def include(dom, para, next_parser):
 	if is_include(para):
 		last_include = para.search(is_include_end)
 		if last_include is None:
-			make_node(dom, 'error', para['text'])
+			make_error(dom, para)
 			return
 		else:
 			next_para = last_include.next()
@@ -315,13 +351,21 @@ def include(dom, para, next_parser):
 		last_run = include_para.last().search(lambda para: para['text'], reverse=True)['runs'][-1]
 		last_run['text'] = trailing_quote_re.sub('', last_run['text'])
 
-		if len(include_para._paras) > 1 and is_section(include_para):
+		# if para['index'] == 1334:
+		# 	import ipdb
+		# 	ipdb.set_trace()
+		if include_para.get('toc'):
+			for i_para in include_para.paras:
+				make_text(include_dom, i_para['text'], proof=False)
+		if is_any_container(include_para):
+			container(include_dom, include_para)
+		elif is_section(include_para):
 			section(include_dom, include_para)
 		elif is_any_para(include_para):
-			paras(include_dom, include_para)
+			para_parser(include_dom, include_para)
 		else:
 			for i_para in include_para.paras:
-				make_text(dom, i_para['text'])
+				make_text(include_dom, i_para['text'])
 	if next_para:
 		next_parser(dom, next_para)
 
@@ -333,46 +377,43 @@ def text(dom, para, next_parser):
 	if text_para:
 		for text_para in text_para.paras:
 			make_text(dom, text_para['text'])
+		if next_para and 'designation' in text_para.last()['text']: 
+			next_para['toc'] = True # hint to include parser whether include is a toc entry
 
 	if not next_para:
 		return
 
-	next_para, posttext_para = next_para.trailing(matcher=is_text)
+	next_para, aftertext_para = next_para.trailing(matcher=is_text)
 
 	if next_para:
 		next_parser(dom, next_para)
 
-	if posttext_para:
-		for text_para in posttext_para.paras:
-			make_text(dom, text_para['text'], post=True)
+	if aftertext_para:
+		for text_para in aftertext_para.paras:
+			make_text(dom, text_para['text'], after=True)
 
 def unhandled(dom, para, next_parser):
-	raise(Exception('unhandled paras:', para._paras[para.raw_index:]))
+	for para in para.paras:
+		make_error(dom, para)
 
-para = pipeline(_para, text, include)
-paras = pipeline(
-	para,
-	para,
-	para,
-	para,
-	para,
-	para,
-	unhandled,
-)
+para_parser = pipeline(_para, text, include)
+
 section = pipeline(
 	_section,
 	text,
 	include,
-	paras,
+	para_parser,
 )
 
+container = pipeline(
+	_container,
+	section,
+)
 parser = pipeline(
 	header,
 	toc,
 	short_title,
-	title,
-	subtitle,
-	section,
+	container,
 )
 
 def make_node(parent, tag, text='', **attrs):
@@ -391,6 +432,7 @@ def make_node(parent, tag, text='', **attrs):
 	return n
 
 def make_container(parent, prefix, num, heading):
+	prefix = prefix.capitalize()
 	container = make_node(parent, 'container', None)
 	make_node(container, 'num', num)
 	if heading:
@@ -405,7 +447,7 @@ def make_section(parent, num, heading=None, **kwargs):
 	section = make_node(parent, 'section', None)
 	make_node(section, 'num', num)
 	if heading:
-		make_node(section, 'heading', heading, ambig=True)
+		make_node(section, 'heading', heading, proof=True)
 	return section
 
 def make_para(parent, num, **kwargs):
@@ -413,12 +455,20 @@ def make_para(parent, num, **kwargs):
 	make_node(para, 'num', num)
 	return para
 
-def make_text(parent, text=None, post=None, **kwargs):
-	tag = 'postText' if post else 'text'
+def make_text(parent, text=None, after=None, proof=None, **kwargs):
+	text = text.strip()
+	tag = 'aftertext' if after else 'text'
+	if proof is None:
+		proof = (text and not (text[0].isupper() or text[0] in '"\u201c')) 
 	if text:
-		return make_node(parent, tag, text, ambig=post)
+		return make_node(parent, tag, text, proof=proof or after)
 	else:
 		return None
+
+def make_error(dom, para):
+	global errors
+	errors += 1
+	error_dom = make_node(dom, 'error', para['text'])
 
 def main():
 	dom = etree.Element("measure")
