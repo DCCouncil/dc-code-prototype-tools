@@ -15,7 +15,7 @@
 
 import sys, re, lxml.etree as etree, datetime, json
 from worddoc import open_docx
-from matchers import Matcher, isint
+from matchers import Matcher, isint, exists
 
 errors = 0
 
@@ -145,7 +145,8 @@ def parse_file(path_to_file):
 def pipeline(*parsers, final_parser=None):
 	def _next_parser(dom, para, next_parser=None):
 		if parsers:
-			return parsers[0](dom, para, pipeline(*parsers[1:], final_parser=final_parser or next_parser))
+			parser = parsers[0] if callable(parsers[0]) else globals()[parsers[0]]
+			return parser(dom, para, pipeline(*parsers[1:], final_parser=final_parser or next_parser))
 		elif next_parser:
 			return next_parser(dom, para)
 		elif final_parser:
@@ -214,42 +215,6 @@ def _container(dom, para, next_parser):
 	else:
 		next_parser(dom, para)
 
-is_title = Matcher({
-	'properties': {'outlineLvl': '0'},
-	'text': re.compile(r'^title (?P<num>[\w-]+\.) (?P<heading>.+)', re.I),
-}, {
-	'properties': {'style': 'Heading1'},
-	'text': re.compile(r'^title (?P<num>[\w-]+\.) (?P<heading>.+)', re.I),
-})
-
-def title(dom, para, next_parser):
-	if is_title(para):
-		title_paras = para.split(is_title)
-		for title_para in title_paras:
-			is_title(title_para)
-			title_dom = make_container(dom, prefix='Title', **title_para['text_re'].groupdict())
-			next_parser(title_dom, title_para.next())
-	else:
-		next_parser(dom, para)
-
-is_subtitle = Matcher({
-	'properties': {'outlineLvl': '1'},
-	'text': re.compile(r'^subtitle (?P<num>[\w-]+\.) (?P<heading>.+)', re.I),
-}, {
-	'properties': {'style': 'Heading1'},
-	'text': re.compile(r'^subtitle (?P<num>[\w-]+\.) (?P<heading>.+)', re.I),
-})
-
-def subtitle(dom, para, next_parser):
-	if is_subtitle(para):
-		subtitle_paras = para.split(is_subtitle)
-		for subtitle_para in subtitle_paras:
-			is_subtitle(subtitle_para)
-			subtitle_dom = make_container(dom, prefix='Subtitle', **subtitle_para['text_re'].groupdict())
-			next_parser(subtitle_dom, subtitle_para.next())
-	else:
-		next_parser(dom, para)
-
 detect_section = Matcher({'text': re.compile(r'^Sec[,. ;/):-]')})
 is_section = Matcher({'text': re.compile(r'^(\u00a7|Sec\.) (?P<num>[\w.-]+)\. (?P<heading>[^\(][^.]+\.(\s|$))?(?P<remainder>.*)')})
 
@@ -257,7 +222,7 @@ def _section(dom, para, next_parser):
 	section_paras = para.split(detect_section)
 	for section_para in section_paras:
 		if not is_section(section_para):
-			make_error(dom, section_para)
+			make_error(dom, section_para, reason='invalid section')
 			return
 		re_sults = section_para['text_re'].groupdict()
 		section_dom = make_section(dom, **re_sults)
@@ -285,19 +250,29 @@ def is_para(indent=None):
 
 is_any_para = is_para()
 
+has_leading_whitespace = Matcher({'runs': [{'text': re.compile(r'^\s')}]})
 def _para(dom, para, next_parser):
 	if not is_any_para(para):
-		make_error(dom, para)
+		make_error(dom, para, reason='invalid numbered para')
+		return
+	if has_leading_whitespace(para):
+		make_error(dom, para, reason='leading whitespace')
 		return
 	run = para['runs'][0]['text']
-	indent = para['properties'].get('indentation', len(run) - len(run.lstrip(' ')))
+	indent = para['properties'].get('indentation')
 	_is_para = is_para(indent)
 	para_paras = para.split(_is_para)
 
 	for para_para in para_paras:
-		if not _is_para(para):
-			make_error(dom, para)
-			return
+		# if para_para['index'] >= 22:
+		# 	import ipdb
+		# 	ipdb.set_trace()
+		if not _is_para(para_para):
+			make_error(dom, para_para, reason='invalid numbered para')
+			continue
+		if has_leading_whitespace(para_para):
+			make_error(dom, para_para, reason='leading whitespace')
+			continue
 		re_sults = para_para['text_re'].groupdict()
 		para_dom = make_para(dom, **re_sults)
 
@@ -345,18 +320,23 @@ def include(dom, para, next_parser):
 		for i_para in include_para.paras:
 			if not i_para['text']:
 				continue
-			char = '"' if i_para['text'].startswith('"') else '\u201c'
-			first_run = i_para['runs'][0]
-			first_run['text'] = first_run['text'].replace(char, '', 1)
+
+			text = i_para['text'].replace('\u201c', '"').replace('\u201d', '"')
+			missing_quotes = []
+			if text.startswith('"'):
+				i_para['text'] = text[1:]
+			elif not text == '@@TABLE@@':
+				missing_quotes.append(i_para)
+
+			for missing_quote in missing_quotes:
+				make_error(include_dom, missing_quote, 'missing double quote')
+
 		last_run = include_para.last().search(lambda para: para['text'], reverse=True)['runs'][-1]
 		last_run['text'] = trailing_quote_re.sub('', last_run['text'])
 
-		# if para['index'] == 1334:
-		# 	import ipdb
-		# 	ipdb.set_trace()
 		if include_para.get('toc'):
 			for i_para in include_para.paras:
-				make_text(include_dom, i_para['text'], proof=False)
+				make_text(include_dom, i_para, proof=False)
 		if is_any_container(include_para):
 			container(include_dom, include_para)
 		elif is_section(include_para):
@@ -365,7 +345,7 @@ def include(dom, para, next_parser):
 			para_parser(include_dom, include_para)
 		else:
 			for i_para in include_para.paras:
-				make_text(include_dom, i_para['text'])
+				make_text(include_dom, i_para)
 	if next_para:
 		next_parser(dom, next_para)
 
@@ -376,7 +356,7 @@ def text(dom, para, next_parser):
 
 	if text_para:
 		for text_para in text_para.paras:
-			make_text(dom, text_para['text'])
+			make_text(dom, text_para)
 		if next_para and 'designation' in text_para.last()['text']: 
 			next_para['toc'] = True # hint to include parser whether include is a toc entry
 
@@ -390,13 +370,13 @@ def text(dom, para, next_parser):
 
 	if aftertext_para:
 		for text_para in aftertext_para.paras:
-			make_text(dom, text_para['text'], after=True)
+			make_text(dom, text_para, after=True)
 
 def unhandled(dom, para, next_parser):
 	for para in para.paras:
-		make_error(dom, para)
+		make_error(dom, para, reason='too confused')
 
-para_parser = pipeline(_para, text, include)
+para_parser = pipeline(_para, text, include, 'para_parser')
 
 section = pipeline(
 	_section,
@@ -414,6 +394,7 @@ parser = pipeline(
 	toc,
 	short_title,
 	container,
+	unhandled,
 )
 
 def make_node(parent, tag, text='', **attrs):
@@ -455,33 +436,41 @@ def make_para(parent, num, **kwargs):
 	make_node(para, 'num', num)
 	return para
 
-def make_text(parent, text=None, after=None, proof=None, **kwargs):
+is_auto_numbered = Matcher({'properties': {'num': exists()}})
+
+def make_text(parent, para, after=None, proof=None, **kwargs):
+	text = para['text']
+	if not text:
+		return None
+	if '\t' in text or '  ' in text:
+		return make_error(parent, para, 'whitespace')
+	if is_auto_numbered(para):
+		return make_error(parent, para, 'autonumbered')
 	text = text.strip()
 	tag = 'aftertext' if after else 'text'
 	if proof is None:
 		proof = (text and not (text[0].isupper() or text[0] in '"\u201c')) 
-	if text:
-		return make_node(parent, tag, text, proof=proof or after)
-	else:
-		return None
+	return make_node(parent, tag, text, proof=proof or after)
 
-def make_error(dom, para):
+def make_error(dom, para, reason=None):
 	global errors
 	errors += 1
-	error_dom = make_node(dom, 'error', para['text'])
+	error_dom = make_node(dom, 'error', para['text'], reason=reason)
 
-def main():
+def parse(path, save=False):
 	dom = etree.Element("measure")
-	paras = parse_file(sys.argv[1])
+	paras = parse_file(path)
 	# save copy of doc for debugging
-	with open('doc.json', 'w') as f:
-		json.dump(paras, f, indent=2)
+	if save:
+		with open('doc.json', 'w') as f:
+			json.dump(paras, f, indent=2)
 	slice_index = Para(paras, paras[-1]).search(lambda para: para['text'].startswith('Chairman'), reverse=True).prev()['index']
 	paras = paras[0:slice_index]
 
 	parser(dom, Para(paras, paras[0]))
 
-	sys.stdout.buffer.write(etree.tostring(dom, pretty_print=True, encoding="utf-8"))
+	return dom
 
 if __name__ == '__main__':
-	main()
+	dom = parse(sys.argv[1], True)
+	sys.stdout.buffer.write(etree.tostring(dom, pretty_print=True, encoding="utf-8"))
