@@ -216,7 +216,7 @@ def _container(dom, para, next_parser):
 		next_parser(dom, para)
 
 detect_section = Matcher({'text': re.compile(r'^Sec[,. ;/):-]')})
-is_section = Matcher({'text': re.compile(r'^(\u00a7|Sec\.) (?P<num>[\w.-]+)\. (?P<heading>[^\(][^.]+\.(\s|$))?(?P<remainder>.*)')})
+is_section = Matcher({'text': re.compile(r'^(\u00a7|Sec\.) (?P<num>[\w.-]+)\. (?P<heading>[^\(][^.]+\.(\s[A-Z]|$))?(?P<remainder>.*)')})
 
 def _section(dom, para, next_parser):
 	section_paras = para.split(detect_section)
@@ -234,33 +234,29 @@ def _section(dom, para, next_parser):
 		if next_para:
 			next_parser(section_dom, next_para)
 
-para_re = re.compile(r'^(?P<num>\([\w-]+\)) ?(?P<remainder>.*)')
-def is_para(indent=None):
-	if indent is not None:
-		matcher = Matcher({
-			'properties': {'indentation': indent},
-			'text': para_re,
-		}, {
-			'runs':[{'text': re.compile(r'^ {{{}}}[^ ]'.format(indent))}],
-			'text': para_re,
-		})
-	else:
-		matcher = Matcher({'text': para_re})
-	return matcher
+has_leading_whitespace = Matcher({'runs': [{'text': re.compile(r'^\s*')}]})
 
-is_any_para = is_para()
+def get_indent(para):
+	indent = para['properties'].get('indentation', 0) / 720
+	if has_leading_whitespace(para):
+		indent += para['runs'][0]['text_re'].group().count('\t')
+	return indent
 
-has_leading_whitespace = Matcher({'runs': [{'text': re.compile(r'^\s')}]})
+is_any_para = Matcher({'text': re.compile(r'^(?P<num>\([\w-]+\)) ?(?P<remainder>.*)')})
+
+def is_para(para):
+	indent = get_indent(para)
+	def _is_para(para):
+		return (get_indent(para) == indent) and is_any_para(para)
+	return _is_para
+
+
 def _para(dom, para, next_parser):
 	if not is_any_para(para):
 		make_error(dom, para, reason='invalid numbered para')
 		return
-	if has_leading_whitespace(para):
-		make_error(dom, para, reason='leading whitespace')
-		return
-	run = para['runs'][0]['text']
 	indent = para['properties'].get('indentation')
-	_is_para = is_para(indent)
+	_is_para = is_para(para)
 	para_paras = para.split(_is_para)
 
 	for para_para in para_paras:
@@ -270,14 +266,12 @@ def _para(dom, para, next_parser):
 		if not _is_para(para_para):
 			make_error(dom, para_para, reason='invalid numbered para')
 			continue
-		if has_leading_whitespace(para_para):
-			make_error(dom, para_para, reason='leading whitespace')
-			continue
 		re_sults = para_para['text_re'].groupdict()
 		para_dom = make_para(dom, **re_sults)
 
 		if re_sults['remainder']:
 			para_para['text'] = re_sults['remainder']
+			para_para['runs'][0]['text'] = '\t' + para_para['runs'][0]['text']
 			next_para = para_para
 		else:
 			next_para = para_para.next()
@@ -322,17 +316,14 @@ def include(dom, para, next_parser):
 				continue
 
 			text = i_para['text'].replace('\u201c', '"').replace('\u201d', '"')
-			missing_quotes = []
 			if text.startswith('"'):
 				i_para['text'] = text[1:]
 			elif not text == '@@TABLE@@':
-				missing_quotes.append(i_para)
+				make_error(include_dom, i_para, 'missing double quote')
+		include_para = include_para.paras[0]
 
-			for missing_quote in missing_quotes:
-				make_error(include_dom, missing_quote, 'missing double quote')
-
-		last_run = include_para.last().search(lambda para: para['text'], reverse=True)['runs'][-1]
-		last_run['text'] = trailing_quote_re.sub('', last_run['text'])
+		last_include = include_para.last().search(lambda para: para['text'], reverse=True)
+		last_include['text'] = trailing_quote_re.sub('', last_include['text'])
 
 		if include_para.get('toc'):
 			for i_para in include_para.paras:
@@ -442,7 +433,7 @@ def make_text(parent, para, after=None, proof=None, **kwargs):
 	text = para['text']
 	if not text:
 		return None
-	if '\t' in text or '  ' in text:
+	if '\t' in text or '   ' in text:
 		return make_error(parent, para, 'whitespace')
 	if is_auto_numbered(para):
 		return make_error(parent, para, 'autonumbered')
@@ -458,7 +449,14 @@ def make_error(dom, para, reason=None):
 	error_dom = make_node(dom, 'error', para['text'], reason=reason)
 
 def parse(path, save=False):
-	dom = etree.Element("measure")
+	dom = etree.Element("measure",
+		attrib={
+			"{http://www.w3.org/2001/XMLSchema-instance}schemaLocation": "http://code.dccouncil.us/schemas/statute http://dccode.council.local/schemas/statute.xsd",
+		},
+		nsmap={
+			None: "http://code.dccouncil.us/schemas/statute",
+			"xsi": "http://www.w3.org/2001/XMLSchema-instance",
+  	})
 	paras = parse_file(path)
 	# save copy of doc for debugging
 	if save:

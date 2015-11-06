@@ -8,7 +8,8 @@ from pygments import highlight
 from shutil import rmtree
 
 def is_docx(path):
-    return path.endswith('.docx')
+    base = os.path.basename(path)
+    return path.endswith('.docx') and not base.startswith('~')
 
 xml_lexer = XmlLexer()
 html_formatter = HtmlFormatter(style='igor')
@@ -27,7 +28,7 @@ class EventHandler(FileSystemEventHandler):
         for child in children:
             if child == 'index.html':
                 continue
-            url_path = './#' + os.path.join(self.rel_path(src_path), child)
+            url_path = '#' + os.path.join(self.rel_path(src_path), child)
             child_path = os.path.join(pyg_path, child)
             glyph = '&#128194;'
             error = ''
@@ -67,11 +68,11 @@ class EventHandler(FileSystemEventHandler):
             self.make_index(src_path)
 
     def make_file(self, src_path, update_index=True):
-        if not is_docx(src_path):
-            return
-
-        dom = parse(src_path)
-        xml = etree.tostring(dom, pretty_print=True, encoding="utf-8")
+        try:
+            dom = parse(src_path)
+            xml = etree.tostring(dom, pretty_print=True, encoding="utf-8")
+        except:
+            xml = '<error errors="1">A fatal parsing error occurred. Please contact support</error>'
         with open(self.raw_path(src_path), 'wb') as f:
             f.write(xml)
         html = highlight(xml, xml_lexer, html_formatter)
@@ -121,9 +122,11 @@ def walk(event_handler):
     dirs_to_update = []
     for root, dirs, files in os.walk(event_handler.in_path):
         event_handler.make_dir(root, False)
-        dirs_to_update.append(root)
+        dirty = False
         for f in files:
             src_path = os.path.join(root, f)
+            if not is_docx(src_path):
+                continue
             raw_path = event_handler.raw_path(src_path)
             pyg_path = event_handler.pygments_path(src_path)
             src_mod_time = os.path.getmtime(src_path)
@@ -131,10 +134,15 @@ def walk(event_handler):
                 raw_mod_time = os.path.getmtime(raw_path)
                 pyg_mod_time = os.path.getmtime(pyg_path)
             except FileNotFoundError:
-                event_handler.make_file(src_path)
+                dirty = True
+                event_handler.make_file(src_path, False)
             else:
                 if src_mod_time >= raw_mod_time or src_mod_time >= pyg_mod_time:
-                    event_handler.make_file(src_path)
+                    dirty = True
+                    event_handler.make_file(src_path, False)
+        if dirty:
+            dirs_to_update.append(root)
+
 
     for path in dirs_to_update:
         event_handler.make_index(path)
@@ -145,12 +153,16 @@ if __name__ == '__main__':
     out_path = os.path.abspath(sys.argv[2])
     event_handler = EventHandler(in_path, out_path)
 
-    walk(event_handler)
-    observer.schedule(event_handler, in_path, recursive=True)
-    observer.start()
-    try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        observer.stop()
-    observer.join()
+    while True:
+        walk(event_handler)
+        time.sleep(1)
+
+    # walk(event_handler)
+    # observer.schedule(event_handler, in_path, recursive=True)
+    # observer.start()
+    # try:
+    #     while True:
+    #         time.sleep(1)
+    # except KeyboardInterrupt:
+    #     observer.stop()
+    # observer.join()
