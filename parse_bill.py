@@ -131,13 +131,25 @@ class Para(dict):
 	@property
 	def paras(self):
 	    return [Para(self._paras, para) for para in self._paras]
-	
+
+has_leading_whitespace = Matcher({'runs': [{'text': re.compile(r'^\s*')}]})
+
+def get_indent(para):
+	indent = para['properties'].get('indentation', 0) / 720
+	if has_leading_whitespace(para):
+		indent += para['runs'][0]['text_re'].group().count('\t')
+		del(para['runs'][0]['text_re'])
+	return int(indent)
+
 def parse_file(path_to_file):
 	doc = open_docx(path_to_file)
 	paras = []
 	for section in doc['sections']:
 		for index, para in enumerate(section['paragraphs'], len(paras)):
 			para['index'] = index
+			para['indent'] = get_indent(para)
+			for runs in para['runs']:
+				runs['text'] = runs['text'].replace('\u201c', '"').replace('\u201d', '"')
 		paras += section['paragraphs']
 
 	return paras
@@ -234,20 +246,12 @@ def _section(dom, para, next_parser):
 		if next_para:
 			next_parser(section_dom, next_para)
 
-has_leading_whitespace = Matcher({'runs': [{'text': re.compile(r'^\s*')}]})
-
-def get_indent(para):
-	indent = para['properties'].get('indentation', 0) / 720
-	if has_leading_whitespace(para):
-		indent += para['runs'][0]['text_re'].group().count('\t')
-	return indent
-
 is_any_para = Matcher({'text': re.compile(r'^(?P<num>\([\w-]+\)) ?(?P<remainder>.*)')})
 
 def is_para(para):
-	indent = get_indent(para)
+	indent = para['indent']
 	def _is_para(para):
-		return (get_indent(para) == indent) and is_any_para(para)
+		return (para['indent'] == indent) and is_any_para(para)
 	return _is_para
 
 
@@ -260,7 +264,7 @@ def _para(dom, para, next_parser):
 	para_paras = para.split(_is_para)
 
 	for para_para in para_paras:
-		# if para_para['index'] >= 22:
+		# if para_para['index'] >= 25:
 		# 	import ipdb
 		# 	ipdb.set_trace()
 		if not _is_para(para_para):
@@ -271,7 +275,7 @@ def _para(dom, para, next_parser):
 
 		if re_sults['remainder']:
 			para_para['text'] = re_sults['remainder']
-			para_para['runs'][0]['text'] = '\t' + para_para['runs'][0]['text']
+			para_para['indent'] += 1
 			next_para = para_para
 		else:
 			next_para = para_para.next()
@@ -281,16 +285,20 @@ def _para(dom, para, next_parser):
 			else:
 				next_parser(para_dom, next_para)
 
+trailing_quote_re = re.compile(r'"(.?)$')
+
 def is_include(para):
-	text = para['text'].replace('\u201c', '"').replace('\u201d', '"')
-	return bool((text.startswith('"') and (text.count('"') % 2 or text.endswith('".'))))
+	text = para['text']
+	return bool((text.startswith('"') and (text.count('"') % 2 or trailing_quote_re.search(text))))
 
 def is_include_end(para):
-	text = para['text'].replace('\u201c', '"').replace('\u201d', '"')
-	return bool((text.endswith('".') and (text.startswith('"') or text.count('"') % 2)))
+	text = para['text']
+	return bool((trailing_quote_re.search(text) and (text.startswith('"') or text.count('"') % 2)))
 
-trailing_quote_re = re.compile(r'["\u201d]\.\s*$')
 def include(dom, para, next_parser):
+	# if para['index'] >= 29:
+	# 	import ipdb
+	# 	ipdb.set_trace()
 	if is_include(para):
 		last_include = para.search(is_include_end)
 		if last_include is None:
@@ -322,6 +330,7 @@ def include(dom, para, next_parser):
 				make_error(include_dom, i_para, 'missing double quote')
 		include_para = include_para.paras[0]
 
+		trailing_char = trailing_quote_re.search(last_include['text']).group(1)
 		last_include = include_para.last().search(lambda para: para['text'], reverse=True)
 		last_include['text'] = trailing_quote_re.sub('', last_include['text'])
 
@@ -337,6 +346,10 @@ def include(dom, para, next_parser):
 		else:
 			for i_para in include_para.paras:
 				make_text(include_dom, i_para)
+
+		if trailing_char:
+			make_text(dom, {'text': trailing_char}, proof=False)
+
 	if next_para:
 		next_parser(dom, next_para)
 
