@@ -71,8 +71,9 @@ class EventHandler(FileSystemEventHandler):
         try:
             dom = parse(src_path)
             xml = etree.tostring(dom, pretty_print=True, encoding="utf-8")
-        except:
-            xml = '<error errors="1">A fatal parsing error occurred. Please contact support</error>'
+        except BaseException as e:
+            print()
+            xml = '<error errors="1">A fatal parsing error occurred. Please contact support. {}</error>'.format(e).encode('utf-8')
         with open(self.raw_path(src_path), 'wb') as f:
             f.write(xml)
         html = highlight(xml, xml_lexer, html_formatter)

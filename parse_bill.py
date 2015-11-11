@@ -348,7 +348,7 @@ def include(dom, para, next_parser):
 				make_text(include_dom, i_para)
 
 		if trailing_char:
-			make_text(dom, {'text': trailing_char}, proof=False)
+			make_text(dom, {'text': trailing_char}, proof=False, after=True)
 
 	if next_para:
 		next_parser(dom, next_para)
