@@ -74,7 +74,7 @@ placeholder = Matcher({
 
 section = Matcher({
 	'properties': {'style': 'Title'},
-	'text': re.compile(r'^\u00a7 (?P<num>[:.\w-]+)\.( (?P<heading>.+))?'),
+	'text': re.compile(r'^\u00a7 +(?P<num>[:.\w-]+)\.( (?P<heading>.+))?'),
 })
 
 toc_entry = Matcher({

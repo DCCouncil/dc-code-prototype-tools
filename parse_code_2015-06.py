@@ -44,8 +44,23 @@ def main():
 	dom.set("type", "document")
 	_make_node(dom, "heading", "Code of the District of Columbia")
 	meta = _make_node(dom, "meta", None)
-	_make_node(meta, "recency", sys.argv[2] if len(sys.argv) > 2 else "xxx")
-
+	recency = etree.fromstring(sys.argv[2] if len(sys.argv) > 2 else """
+    <recency>
+      <law>
+        <law>20-241</law>
+        <effective>2015-04-13</effective>
+      </law>
+      <emergency>
+        <law>20-617</law>
+        <effective>2015-01-28</effective>
+      </emergency>
+      <federal>
+        <law>113-235</law>
+        <effective>2014-12-16</effective>
+      </federal>
+    </recency>
+""")
+	meta.append(recency)
 	start_time = time.time()
 	DIR = sys.argv[1]
 	try:
@@ -65,7 +80,6 @@ def main():
 def pict_handler(node):
 	return "@@PICT@@"
 
-def 
 def _hashfile(filepath):
     import hashlib
     sha1 = hashlib.sha1()

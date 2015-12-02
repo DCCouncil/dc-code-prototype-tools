@@ -353,10 +353,12 @@ def pipeline(*parsers, i=0):
 
 def _make_node(parent, tag, text, **attrs):
 	""" Make a node in an XML document. """
+	attrs.pop('para', None)
 	n = etree.Element(tag)
 	if parent is not None:
 		parent.append(n)
-	n.text = text
+	if text:
+		n.text = text.strip()
 	for k, v in attrs.items():
 		if v is None: continue
 		if isinstance(v, datetime.datetime):
