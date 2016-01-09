@@ -23,7 +23,7 @@ with open(tables_path or 'tables.xml') as f:
 
 num_re = re.compile('<num>(?P<num>.+?)</num>')
 table_re = re.compile(r'@@TABLE@@')
-sections = xml.split('<level type="section">\n')
+sections = xml.split('<section>\n')
 
 out = []
 for section in sections:
@@ -52,7 +52,7 @@ if len(Tables.findall('section/table[@inserted]')) != len(Tables.findall('sectio
 	ipdb.set_trace()
 	raise Exception('some tables not inserted')
 
-out = '<level type="section">\n'.join(out).encode('utf-8')
+out = '<section>\n'.join(out).encode('utf-8')
 dom = etree.fromstring(out)
 
 with open(out_path, 'wb') as f:

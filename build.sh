@@ -5,14 +5,12 @@ echo 'inserting tables' &&
 python insert_tables.py &&
 echo 'python splitting' &&
 python split_up.py ../dc-code-prototype < 2015-06t.xml &&
-cd ../dc-code-prototype &&
-git checkout Title-1/Chapter-15/ &&
 echo 'generating html' &&
 cd ../simple-generator &&
-echo 'making index' &&
-node make_index.js ../dc-code-prototype &&
-echo 'building html' &&
-node index.js ../dc-code-prototype/ simple
+python prebuild.py &&
+cd ./simple &&
+git checkout Title-1/Chapter-15/ &&
+git checkout sections/1-15-*
 
 cd $CWD
 tput bel

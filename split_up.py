@@ -21,12 +21,12 @@ def write_node(node, path, filename, backpath, toc, seen_filenames):
 	# and replace them with XInclude tags. We don't split at Divisions because these are
 	# of no interest to anyone, the numbering of titles has global scope, and it just feels
 	# like clutter.
-	if node.xpath("string(@type)") == "document":
-		subnodes = node.xpath("level[prefix='Division']/level[prefix='Title']")
+	if node.tag == "code":
+		subnodes = node.xpath("container[prefix='Division']/container[prefix='Title']")
 	elif node.xpath("string(prefix)") == "Title":
-		subnodes = node.xpath("level[(@type='toc' or @type='section' or @type='placeholder') and not(prefix='Subtitle')] | level[prefix='Subtitle']/level[(@type='toc' or @type='section' or @type='placeholder')]")
-	elif node.xpath("string(@type)") == "toc":
-		subnodes = node.xpath("level[(@type='toc' or @type='section' or @type='placeholder')]")
+		subnodes = node.xpath("container[not(prefix='Subtitle')] | section | placeholder | container[prefix='Subtitle']/*[self::container or self::section or self::placeholder]")
+	elif node.tag == "container":
+		subnodes = node.xpath("container | section | placeholder")
 	else:
 		subnodes = None
 
@@ -34,7 +34,7 @@ def write_node(node, path, filename, backpath, toc, seen_filenames):
 		for child in subnodes:
 			# When we recurse, where should we put the file?
 
-			if child.xpath("string(@type)") == "placeholder":
+			if child.tag == "placeholder":
 				if child.xpath("string(section)"):
 					fn = child.xpath("string(section)") + "~P.xml"
 				elif child.xpath("string(section-start)") and child.xpath("string(section-end)"):
@@ -43,7 +43,7 @@ def write_node(node, path, filename, backpath, toc, seen_filenames):
 					raise Exception()
 				sub_path = ""
 				bp = backpath
-			elif child.xpath("string(@type)") == "section":
+			elif child.tag == "section":
 				# print(child.xpath("string(num)"))
 				fn = child.xpath("string(num)") + ".xml"
 				sub_path = ""
@@ -58,10 +58,9 @@ def write_node(node, path, filename, backpath, toc, seen_filenames):
 			
 			toc_entry = make_node(toc, child.tag, None)
 			make_node(toc_entry, "href", path + sub_path + fn)
-			toc_entry.set("type", child.get("type"))
 			for tag in ("num", "section", "section-start", "section-end", "section-range-type", "heading", "reason"):
 				if child.xpath("string(%s)" % tag): make_node(toc_entry, tag, child.xpath("string(%s)" % tag))
-			if child.xpath("string(@type)") == "toc": 
+			if child.tag == "container": 
 				toc_entry_container = make_node(toc_entry, "children", None)
 			else:
 				toc_entry_container = None

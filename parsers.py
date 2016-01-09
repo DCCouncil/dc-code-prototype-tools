@@ -23,7 +23,7 @@ def parse_division(dom, NextParser):
 		if next_parser:
 			return next_parser(para)
 		elif matchers.division(para):
-			div_node = _make_level(dom, 'toc', 'Division', **match.groupdict())
+			div_node = _aaa(dom, 'container', 'Division', **match.groupdict())
 			next_parser = NextParser(div_node)
 			return True
 		else:
@@ -54,7 +54,7 @@ def ParseToc(matcher, prefix, tag='toc'):
 				node_data = match.groupdict()
 				if node_data['heading']:
 					node_data['heading'] = repealed_re.sub('', node_data['heading'])
-				toc_node = _make_level(dom, tag, prefix, para=para['index'], **match.groupdict())
+				toc_node = _aaa(dom, 'container', prefix, para=para['index'], **match.groupdict())
 				next_parser = NextParser(toc_node)
 				just_started = True
 				return True
@@ -85,7 +85,7 @@ def parse_unit(dom, NextParser):
 			node_data = match.groupdict()
 			if node_data['heading']:
 				node_data['heading'] = repealed_re.sub('', node_data['heading'])
-			toc_node = _make_level(dom, 'toc', 'Unit', para=para['index'], **match.groupdict())
+			toc_node = _aaa(dom, 'container', 'Unit', para=para['index'], **match.groupdict())
 			next_parser = NextParser(toc_node)
 			unit_detected = True
 			just_started = True
@@ -140,7 +140,7 @@ def parse_section(parse_text_generator, parse_history_generator, parse_anno_gene
 					return True
 				match = para['text_re']
 				section_node = _make_placeholder(dom, para=para['index'], **match.groupdict())
-				anno_node = _make_level(None, 'annotations')
+				anno_node = _aaa(None, 'annotations')
 				parse_text = parse_text_generator(section_node, NextParser)
 				parse_history = parse_history_generator(anno_node, NextParser)
 				parse_anno = parse_anno_generator(anno_node, NextParser)
@@ -151,8 +151,8 @@ def parse_section(parse_text_generator, parse_history_generator, parse_anno_gene
 				if ignore:
 					return True
 				match = para['text_re']
-				section_node = _make_level(dom, 'section', None, para=para['index'], **match.groupdict())
-				anno_node = _make_level(None, 'annotations')
+				section_node = _aaa(dom, 'section', None, para=para['index'], **match.groupdict())
+				anno_node = _aaa(None, 'annotations')
 				parse_text = parse_text_generator(section_node, NextParser)
 				parse_history = parse_history_generator(anno_node, NextParser)
 				parse_anno = parse_anno_generator(anno_node, NextParser)
@@ -176,7 +176,7 @@ def parse_history(dom, NextParser):
 	def _parse_history(para):
 		nonlocal found
 		if not found and para.get('history', True) and matchers.history(para):
-			_make_level(dom, heading="History", text=para['text'])
+			_aaa(dom, 'annoGroup', heading="History", text=para['text'])
 			found = True
 			return True
 		return False
@@ -276,7 +276,7 @@ def parse_section_nodes(dom, NextParser):
 				# don't know how to handle
 				raise Exception('unknown indent for', para['index'], para)
 			elif props['indent'] == level:
-				para_node = _make_level(dom, **props)
+				para_node = _aaa(dom, 'para', **props)
 				next_parser = parse_section_nodes(para_node, NextParser)
 				if props['num2']:
 					in_child = True
@@ -293,7 +293,7 @@ def parse_section_nodes(dom, NextParser):
 				level = match.group('prefix')
 
 			if level == match.group('prefix'):
-				heading_node = _make_level(dom, **match.groupdict())
+				heading_node = _aaa(dom, 'para', **match.groupdict())
 				next_parser = parse_section_nodes(heading_node, NextParser)
 				in_child = True
 				return True
@@ -310,7 +310,7 @@ def parse_section_nodes(dom, NextParser):
 				if para_node is not None and next_level and (not matchers.isint(level) or next_level >= level):
 					_make_text(para_node, para['text'], para=para['index'])
 				else:
-					_make_text(dom, para['text'], para=para['index'])
+					_make_text(dom, para['text'], para=para['index'], after=True)
 				return True
 			else:
 				return False
@@ -325,7 +325,7 @@ def parse_anno(dom, NextParser):
 		nonlocal anno_node
 		if matchers.anno(para):
 			match = para['text_re']
-			anno_node = _make_level(dom, **match.groupdict())
+			anno_node = _aaa(dom, 'annoGroup', **match.groupdict())
 			return True
 		elif anno_node is not None:
 			if matchers.anytext(para):
@@ -368,6 +368,32 @@ def _make_node(parent, tag, text, **attrs):
 		n.set(k.replace("___", ""), v)
 	return n
 
+def _aaa(parent, tag, prefix=None, num=None, heading=None, text=None, para=None, **kwargs):
+	"""
+	Make a level xml structure:
+	<{tag}>
+	  <prefix>{prefix}</prefix>
+	  <num>{num}</num>
+	  <heading>{heading}</heading>
+	  <text>{text}</text>
+    </{tag}>
+	returning the new level object
+	"""
+	level = _make_node(parent, tag, None, para=para)
+	if prefix:
+		prefix = prefix.capitalize()
+		if parent.attrib.get('childPrefix', prefix) != prefix:
+			raise Exception('all prefixes must be the same but got {} and {}'.format(parent.attrib['childPrefix'], prefix))
+		parent.attrib['childPrefix'] = prefix
+	if num:
+		_make_node(level, 'num', num)
+	if heading:
+		_make_node(level, 'heading', heading)
+	if text:
+		_make_text(level, text)
+	return level
+
+
 
 def _make_level(parent, typ=None, prefix=None, num=None, heading=None, text=None, para=None, **kwargs):
 	"""
@@ -387,7 +413,7 @@ def _make_level(parent, typ=None, prefix=None, num=None, heading=None, text=None
 	return level
 
 def _make_placeholder(parent, reason=None, heading=None, section=None, section_start=None, section_end=None, para=None):
-	level = _make_node(parent, 'level', None, type='placeholder', para=para)
+	level = _make_node(parent, 'placeholder', None, para=para)
 	if reason:
 		_make_node(level, 'reason', reason)
 	if section:
@@ -402,7 +428,8 @@ def _make_placeholder(parent, reason=None, heading=None, section=None, section_s
 
 def _make_text(parent, text=None, para=None, **kwargs):
 	if text:
-		return _make_node(parent, 'text', text, para=para)
+		tag = 'text' if parent.find('para') is None else 'afterText'
+		return _make_node(parent, tag, text, para=para)
 	else:
 		return None
 

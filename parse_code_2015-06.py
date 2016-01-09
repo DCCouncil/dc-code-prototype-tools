@@ -40,8 +40,7 @@ def parse_file(dom, path_to_file, start_para_index):
 
 def main():
 	# Form the output DOM.
-	dom = etree.Element("level")
-	dom.set("type", "document")
+	dom = etree.Element("code")
 	_make_node(dom, "heading", "Code of the District of Columbia")
 	meta = _make_node(dom, "meta", None)
 	recency = etree.fromstring(sys.argv[2] if len(sys.argv) > 2 else """
