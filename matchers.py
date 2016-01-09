@@ -66,15 +66,15 @@ placeholder = Matcher({
 	'properties': {'style': 'Title'},
 	'text': [
 		# TODO: handle comma-separated multiple sections (title 22+)
-		re.compile(r'\u00a7\u00a7 (?P<section_start>[:.\w-]+) to (?P<section_end>[:.\w-]+)\.( (?P<heading>.+) )?\[(?P<reason>[^\[]+)\]\.'),
-		re.compile(r'\u00a7\u00a7 (?P<section_start>[:.\w-]+) to (?P<section_end>[:.\w-]+)\.( (?P<heading>.+))?'),
-		re.compile(r'^\u00a7 (?P<section>[:.\w-]+)\.( (?P<heading>.+) )?\[(?P<reason>[^\[]+)\].'),
+		re.compile(r'\u00a7\u00a7\s+(?P<section_start>[:.\w-]+) to (?P<section_end>[:.\w-]+)\.( (?P<heading>.+) )?\[(?P<reason>[^\[]+)\]\.'),
+		re.compile(r'\u00a7\u00a7\s+(?P<section_start>[:.\w-]+) to (?P<section_end>[:.\w-]+)\.( (?P<heading>.+))?'),
+		re.compile(r'^\u00a7\s+(?P<section>[:.\w-]+)\.( (?P<heading>.+) )?\[(?P<reason>[^\[]+)\].'),
 	]
 })
 
 section = Matcher({
 	'properties': {'style': 'Title'},
-	'text': re.compile(r'^\u00a7 +(?P<num>[:.\w-]+)\.( (?P<heading>.+))?'),
+	'text': re.compile(r'^\u00a7\s+(?P<num>[:.\w-]+)\.( (?P<heading>.+))?'),
 })
 
 toc_entry = Matcher({
