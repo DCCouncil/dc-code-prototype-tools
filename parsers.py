@@ -530,6 +530,8 @@ fix_fns = {
 	280849 + 151597 + 10: _prepend('  '),
 	280849 + 153038 + 10: _update({ "runs": [{'properties': {'b': True}, 'text': '  (a) '}, { "properties": { "font": "Calibri" }, "text": "If a public utility proposes an action, it shall prepare and transmit to the Commission a detailed environmental impact statement within 60 days following the submission of the proposal. The environmental impact statement shall describe in detail the proposed action, the necessity for the proposed action, and a brief discussion of the following factors:" } ]}),
 
+	370997: _update({"runs": [{"text": "\u00a7\u200931-707.01. Supervisory colleges."}]}),
+
 	# div 6
 	438147 + 0: _ignore,
 	438147 + 11156: _ignore,
