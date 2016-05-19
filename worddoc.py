@@ -150,11 +150,23 @@ def process_paragraph(para_node, handlers):
 					# text alignment, but treat "left" as the default by not including it in output
 					if prnode.get(wpns + "val") != "left":
 						properties['align'] = prnode.get(wpns + "val")
-				elif prtag == "w:textAlignment" and prnode.get(wpns + "val") == "auto":
+				elif prtag == "w:textAlignment": # and prnode.get(wpns + "val") == "auto":
 					# this is vertical alignment; don't care
 					pass
 				elif prtag == "w:keepLines" or prtag == "w:keepNext":
 					# this is when to force content to new pages
+					pass
+				elif prtag == "w:suppressAutoHyphens":
+					# this is when suppressing hyphenation; don't care
+					pass
+				elif prtag == "w:kinsoku":
+					# don't care about left/right language
+					pass
+				elif prtag == "w:overflowPunct":
+					# don't care if we allow punctuation to go outside margin
+					pass
+				elif prtag == "w:pBdr":
+					# don't care about borders
 					pass
 				elif prtag == "w:outlineLvl":
 					properties['outlineLvl'] = prnode.get(wpns + "val") # outline level
@@ -202,6 +214,28 @@ def process_paragraph(para_node, handlers):
 				runs[-1]["text"] += run["text"]
 			else:
 				runs.append(run)
+		elif tag == "w:hyperlink":
+			for hypernode in node:
+				hypertag = re.sub("^\{http://schemas.openxmlformats.org/wordprocessingml/2006/main\}", "w:", hypernode.tag)
+				if hypertag == "w:r":
+					run = process_run(hypernode, default_run_properties, handlers)
+					# update the current field state, and skip instruction text when we're in the begin state
+					field_state = run["properties"].get("field_state", field_state)
+					if field_state == "begin": continue # skip all runs while in the "begin" state
+					if "field_state" in run["properties"]: continue # skip runs that just have a field state change
+					
+					# Combine the run with the previous run if it has the same properties
+					# to make pattern matching easier. Various markup things can break a
+					# logical run into smaller pieces in ways we don't care about. Also
+					# combine if the run or previous run only contains whitespace, for
+					# convenience, since formatting changes may be spurrious here.
+					if len(runs) > 0 and (runs[-1]["properties"] == run["properties"] or run["text"].strip() == "" or runs[-1]["text"].strip() == ""):
+						runs[-1]["text"] += run["text"]
+					else:
+						runs.append(run)
+				else:
+					print("Unhandled hypertext node:", hypertag, file=sys.stderr)
+					dump(node)					
 		else:
 			print("Unhandled paragraph content node:", tag, file=sys.stderr)
 			dump(node)
@@ -284,6 +318,10 @@ def process_run(run_node, default_run_properties, handlers):
 			text += handlers["pict"](node)
 		elif tag == "w:pgNum":
 			text += "??PAGENUM??"
+		elif tag == "w:noBreakHyphen":
+			text += "-"
+		elif tag == "w:cr":
+			text += "\n"
 		else:
 			print("Unhandled run content node.", file=sys.stderr)
 			dump(node)
@@ -307,12 +345,22 @@ def process_run_properties(node):
 			# I don't think we care. Highlight seems like maybe we should print a warning.
 			pass
 		
-		elif tag == "lang" and pr.get(wpns + "val") == "en-US":
+		elif tag == "lang": # and pr.get(wpns + "val") == "en-US":
 			# don't care if we're setting language to English
 			pass
-
+		elif tag == "webHidden":
+			# don't care whether this should be shown on the web
+			pass
+		elif tag == "w":
+			# don't care about window width
+			pass
+		elif tag == "bdr":
+			# don't care about borders
+			pass
 		elif tag == "spacing":
 			properties["spacing"] = pr.get(wpns + "val")
+		elif tag == "shd":
+			properties["shading"] = {k.split('}')[1]: v for k, v in pr.attrib.items()}
 		else:
 			print("Unhandled run properties node.", file=sys.stderr)
 			dump(pr)
@@ -327,7 +375,7 @@ def process_section_properties(node):
 			# don't care
 			pass
 
-		elif tag in ("pgNumType"):
+		elif tag in ("pgNumType",):
 			# probably don't care
 			pass
 		
@@ -337,7 +385,8 @@ def process_section_properties(node):
 		elif tag == "type" and pr.get(wpns + "val") == "nextPage":
 			# This is the typical section break type.
 			pass
-
+		elif tag == "lnNumType":
+			properties["linenumbertype"] = {k.split('}')[1]: v for k, v in pr.attrib.items()}
 		else:
 			print("Unhandled section properties node.", file=sys.stderr)
 			dump(pr)

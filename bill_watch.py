@@ -34,7 +34,7 @@ class EventHandler(FileSystemEventHandler):
             error = ''
             if not os.path.isdir(child_path):
                 glyph = '&nbsp;'
-                with open(os.path.join(self.raw_path(src_path), child)[:-4] + 'xml', 'r') as f:
+                with open(os.path.join(self.raw_path(src_path), child)[:-4] + 'xml', 'r', encoding='utf-8') as f:
                     match = error_re.search(f.readline())
                     if match:
                         error = ' <span class="error">({} errors)</span>'.format(match.group(1))
