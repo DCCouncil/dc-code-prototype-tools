@@ -67,6 +67,7 @@ placeholder = Matcher({
 	'text': [
 		# TODO: handle comma-separated multiple sections (title 22+)
 		re.compile(r'\u00a7\u00a7\s+(?P<section_start>[:.\w-]+) to (?P<section_end>[:.\w-]+)\.( (?P<heading>.+) )?\[(?P<reason>[^\[]+)\]\.'),
+		re.compile(r'\u00a7\u00a7\s+(?P<section_start>[:.\w-]+), (?P<section_end>[:.\w-]+)\.( (?P<heading>.+) )?\[(?P<reason>[^\[]+)\]\.'),
 		re.compile(r'\u00a7\u00a7\s+(?P<section_start>[:.\w-]+) to (?P<section_end>[:.\w-]+)\.( (?P<heading>.+))?'),
 		re.compile(r'^\u00a7\s+(?P<section>[:.\w-]+)\.( (?P<heading>.+) )?\[(?P<reason>[^\[]+)\].'),
 	]

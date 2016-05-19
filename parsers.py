@@ -383,6 +383,8 @@ def _aaa(parent, tag, prefix=None, num=None, heading=None, text=None, para=None,
 	if prefix:
 		prefix = prefix.capitalize()
 		if parent.attrib.get('childPrefix', prefix) != prefix:
+			import ipdb
+			ipdb.set_trace()
 			raise Exception('all prefixes must be the same but got {} and {}'.format(parent.attrib['childPrefix'], prefix))
 		parent.attrib['childPrefix'] = prefix
 	if num:
@@ -413,15 +415,14 @@ def _make_level(parent, typ=None, prefix=None, num=None, heading=None, text=None
 	return level
 
 def _make_placeholder(parent, reason=None, heading=None, section=None, section_start=None, section_end=None, para=None):
-	level = _make_node(parent, 'placeholder', None, para=para)
+	level = _make_node(parent, 'section', None, para=para)
 	if reason:
 		_make_node(level, 'reason', reason)
 	if section:
-		_make_node(level, 'section', section)
+		_make_node(level, 'num', section)
 	if section_start:
-		_make_node(level, 'section-start', section_start)
-		_make_node(level, 'section-end', section_end)
-		_make_node(level, 'section-range-type', 'range')
+		_make_node(level, 'num', section_start)
+		_make_node(level, 'num-end', section_end)
 	if heading:
 		_make_node(level, 'heading', heading)
 	return level
@@ -451,6 +452,11 @@ def _move_run(old_index, new_index):
 		para['runs'].insert(new_index, para['runs'].pop(old_index))
 		return para
 	return _move_run
+
+def _insert_run(run):
+	def _insert_run(para):
+		para['runs'].insert(0, run)
+	return _insert_run
 
 def _merge(old, new):
 	if matchers.isdict(old) and matchers.isdict(new):
@@ -483,7 +489,7 @@ def bulk_apply(fix_fns, fn, start, end):
 	for i in range(start, end + 1):
 		fix_fns[i] = fn
 
-fix_fns = {
+fix_fns_2015_06 = {
 	0: _ignore,
 
 	# 2015-06
@@ -600,25 +606,98 @@ fix_fns = {
 
 }
 
-	# # 2015-03
-	# # 1-161
-	# 1255: _ignore,
-	# # 1-306.33
-	# 9353: _ignore,
-	# 9355: _ignore,
-	# 9357: _ignore,
-	# # 1-623.02 TODO: fix
-	# 30479: _update({'ignore': True}),
-	# # 1-1163.13 ok
-	# 45066: _update({'ignore': True}),
-	# # 2-218.76
-	# 53159: _update({'properties': {'style': 'Subtitle'}}),
-	# # 2-1223.21
-	# 72360: _update({'runs': [{'text': '\u00a7 2-1223.21. Corporation’s review of plans and projects of District agencies. [Repealed].'}]}),
-	# # 9-1103.02
-	# 191273: _prepend('  '),
-	# 191276: _prepend('  '),
-# }
+fix_fns = {
+	# div 1
+	0: _ignore,
+	3830: _prepend('    '),
+	6939: _prepend(' '),
+	16673: _prepend('§ '),
+	38769: _prepend(' '),
+	73951: _prepend('§ 2-1223.21 '),
+	204857: _update({'runs': [{'text': '    (1) '}]}),
+
+	# div 2
+	211689: _ignore,
+	212518: _prepend(' '), # _update({'properties': {'align': None}})
+	233452: _update({'history': False}),
+	238270: _update({'history': False}),
+
+	# div 3
+	238564: _ignore,
+	240986: _update({'history': False}),
+	240988: _update({'history': False}),
+	241059: _update({'history': False}),
+	241061: _update({'history': False}),
+	241446: _update({'history': False}),
+	241727: _update({'history': False}),
+	241737: _update({'history': False}),
+	245577: _update({'history': False}),
+
+	# div 4
+	255906: _ignore,
+
+	# div 5
+	282220: _ignore,
+	310698: _update({'runs': [{'text': 'Part 1. General Provisions and Definitions.'}]}),
+	310699: _ignore,
+	312084: _update({'runs': [{'text': 'Part 1. Subject Matter and Definitions.'}]}),
+	312085: _ignore,
+	314952: _update({'runs': [{'text': 'Part 1. General.'}]}),
+	314953: _ignore,
+	328300: _update({'history': False}),
+	436678: _update({'runs': [{"properties": {'b': True}, "text": "  (a) "}, {'text': 'If a public utility proposes an action, it shall prepare and transmit to the Commission a detailed environmental impact statement within 60 days following the submission of the proposal. The environmental impact statement shall describe in detail the proposed action, the necessity for the proposed action, and a brief discussion of the following factors:'}]}),
+
+	# div 6
+	440979: _ignore,
+	452582: _ignore,
+	455728: _update({'properties': {'style': 'Title'}}),
+
+	# div 7
+	468188+5: _ignore,
+	471529+5: _update({'history': False}),
+	471545+5: _update({'history': False}),
+	471561+5: _update({'history': False}),
+	471577+5: _update({'history': False}),
+	478944+5: _update({'history': False}),
+	499170+5: _prepend('§§ 42-4071 to 42-4072.'),
+
+	# div 8
+	499205+5: _ignore,
+	528570+5: _update({'article': False}),
+	528581+5: _update({'article': False}),
+	528601+5: _update({'article': False}),
+	528604+5: _update({'article': False}),
+	528607+5: _update({'article': False}),
+	528619+5: _update({'article': False}),
+	528684+5: _update({'article': False}),
+	528696+5: _update({'article': False}),
+	528716+5: _update({'article': False}),
+	528722+5: _update({'article': False}),
+	528733+5: _update({'article': False}),
+	528811+5: _update({'article': False}),
+	
+	573419+5: _update({'runs': [{"text": "      (A) ", 'properties': {'b': True}}, {'text': "In general. \u2014 ", "properties": {"i": True}}, {"text": "Except as provided in subparagraph (C) of this paragraph, if the conditions described in subparagraph (B) of this paragraph are satisfied, each advance made under this subsection shall be in the amount designated by the Mayor in the Mayor\u2019s requisition for such advance, except that:"}]}),
+	598075+5: _update({'article': False}),
+	598093+5: _update({'article': False}),
+	598112+5: _update({'article': False}),
+	598117+5: _update({'article': False}),
+	598135+5: _update({'article': False}),
+	598146+5: _update({'article': False}),
+	598151+5: _update({'article': False}),
+	598159+5: _update({'article': False}),
+	598167+5: _update({'article': False}),
+	# : _update({'article': False}),
+	# : _update({'article': False}),
+	# : _update({'article': False}),
+	# : _update({'article': False}),
+	# : _update({'article': False}),
+	# : _update({'article': False}),
+	# : _update({'article': False}),
+	# : _update({'article': False}),
+
+}
+# div 6
+bulk_apply(fix_fns, _update({'article': False}), 459665, 466635)
 
 def fixes(dom, NextParser):
 	next_parser = NextParser(dom)
