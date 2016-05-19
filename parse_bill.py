@@ -141,8 +141,11 @@ def get_indent(para):
 		del(para['runs'][0]['text_re'])
 	return int(indent)
 
+def pict_handler(node):
+	return "@@PICT@@"
+
 def parse_file(path_to_file):
-	doc = open_docx(path_to_file)
+	doc = open_docx(path_to_file, pict=pict_handler)
 	paras = []
 	for section in doc['sections']:
 		for index, para in enumerate(section['paragraphs'], len(paras)):
@@ -188,9 +191,12 @@ def toc(dom, para, next_parser):
 	while style.startswith('TOC'):
 		if not toc_dom:
 			toc_dom = [make_node(dom, 'toc')]
-		level = int(style[3:])
-		runs = next_para['runs']
-		toc_dom = toc_dom[:level] + [make_node(toc_dom[level-1], 'toc', container=runs[0]['text'].strip(), page=runs[1]['text'].strip())]
+		if style == 'TOCHeading':
+			make_node(toc_dom[0], 'heading', text=next_para.text())
+		else:
+			level = int(style[3:])
+			runs = next_para['runs']
+			toc_dom = toc_dom[:level] + [make_node(toc_dom[level-1], 'toc', container=runs[0]['text'].strip(), page=runs[1]['text'].strip())]
 		next_para = para.next()
 		style = next_para.get('properties', {}).get('style', '')
 		para = next_para
@@ -475,8 +481,10 @@ def parse(path, save=False):
 	if save:
 		with open('doc.json', 'w') as f:
 			json.dump(paras, f, indent=2)
-	slice_index = Para(paras, paras[-1]).search(lambda para: para['text'].startswith('Chairman'), reverse=True).prev()['index']
-	paras = paras[0:slice_index]
+	slice_index = Para(paras, paras[-1]).search(lambda para: para['text'].startswith('Chairman'), reverse=True)
+	if slice_index:
+		slice_index = slice_index.prev()['index']
+		paras = paras[0:slice_index]
 
 	parser(dom, Para(paras, paras[0]))
 
