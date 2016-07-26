@@ -76,11 +76,11 @@ class EventHandler(FileSystemEventHandler):
             xml = '<error errors="1">A fatal parsing error occurred. Please contact support. {}</error>'.format(e).encode('utf-8')
         with open(self.raw_path(src_path), 'wb') as f:
             f.write(xml)
-        html = highlight(xml, xml_lexer, html_formatter)
-        with open(self.pygments_path(src_path), 'w') as f:
-            f.write(html)
-        if update_index:
-            self.make_index(os.path.dirname(src_path))
+        # html = highlight(xml, xml_lexer, html_formatter)
+        # with open(self.pygments_path(src_path), 'w') as f:
+        #     f.write(html)
+        # if update_index:
+        #     self.make_index(os.path.dirname(src_path))
 
     def delete_dir(self, src_path):
         rmtree(self.raw_path(src_path))
