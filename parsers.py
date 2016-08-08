@@ -544,6 +544,14 @@ def _update(new_para):
 		para['richtext'] = _para_rich_text_content(para)
 	return _update
 
+def _and(*fns):
+	def _and(para):
+		resp = False
+		for fn in fns:
+			resp = fn(para) or resp
+		return resp
+	return _and
+
 def bulk_apply(fix_fns, fn, start, end):
 	""" apply fn to lines start through end, inclusive """
 	for i in range(start, end + 1):
@@ -666,7 +674,7 @@ fix_fns_2015_06 = {
 
 }
 
-fix_fns = {
+fix_fns_2016_07 = {
 	# div 1
 	0: _ignore,
 	3830: _prepend('    '),
@@ -757,7 +765,80 @@ fix_fns = {
 
 }
 # div 6
-bulk_apply(fix_fns, _update({'article': False}), 459665, 466635)
+# bulk_apply(fix_fns, _update({'article': False}), 459665, 466635)
+
+fix_fns = {
+	# div 1
+	0: _ignore,
+	16361: _prepend('§ '),
+	71420: _and(_prepend('§§ 2-1223.21, 2-1223.21. '), _update({"properties": {"style": "Title"}})),
+	114191: _update({'runs': [{'text': 'Part A. Regulation and Reporting Requirements.'}]}),
+
+	# div 2
+	200952: _ignore,
+	222592: _update({'history': False}),
+	226459: _update({'history': False}),
+	226460: _update({'history': False}),
+
+	# div 3
+	226753: _ignore,
+	228929: _update({'history': False}),
+	228984: _update({'history': False}),
+	228986: _update({'history': False}),
+	229020: _update({'history': False}),
+	229057: _update({'history': False}),
+	229059: _update({'history': False}),
+	229444: _update({'history': False}),
+	229725: _update({'history': False}),
+	229735: _update({'history': False}),
+	233572: _update({'history': False}),
+
+	# div 4
+	243903: _ignore,
+	255768: _prepend('§§ 22-3801, 22-3802.'),
+	258468: _prepend('§§ 22-4901, 22-4902.'),
+
+	# div 5
+	269363: _ignore,
+	297707: _update({'runs': [{'text': 'Part 1. General Provisions and Definitions.'}]}),
+	297708: _ignore,
+	299093: _update({'runs': [{'text': 'Part 1. Subject Matter and Definitions.'}]}),
+	299094: _ignore,
+	300997: _update({'runs': [{'text': 'Part 1. General.'}]}),
+	300998: _ignore,
+	314345: _update({'history': False}),
+	383626: _prepend('§§ 31-5901, 31-5902.'),
+	407738: _update({'runs': [{"properties": {'b': True}, "text": "  (a) "}, {'text': 'If a public utility proposes an action, it shall prepare and transmit to the Commission a detailed environmental impact statement within 60 days following the submission of the proposal. The environmental impact statement shall describe in detail the proposed action, the necessity for the proposed action, and a brief discussion of the following factors:'}]}),
+	# div 6
+	411979: _ignore,
+	423399: _ignore,
+	423432: _ignore,
+
+	# div 7
+	437982: _ignore,
+	441318: _update({'history': False}),
+	441321: _update({'history': False}),
+	441323: _update({'history': False}),
+	441339: _update({'history': False}),
+	441355: _update({'history': False}),
+	441371: _update({'history': False}),
+	446599: _update({'history': False}),
+	465981: _prepend('§§ 42-4071 to 42-4072.'),
+	
+
+	# div 8
+	466016: _ignore,
+	482675: _update({'runs': [{'text': 'Part A. Registration for Enforcement of Support Order.'}]}),
+
+}
+
+# div 6
+
+bulk_apply(fix_fns, _update({'article': False}), 429692, 436472)
+
+# div 8
+bulk_apply(fix_fns, _update({'article': False}), 491936, 558484)
+
 
 def fixes(dom, NextParser):
 	next_parser = NextParser(dom)
