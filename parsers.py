@@ -15,7 +15,6 @@ import lxml.etree as etree
 import datetime
 import matchers
 
-
 def parse_division(dom, NextParser):
 	next_parser = None
 	def _parse_division(para):
@@ -176,7 +175,7 @@ def parse_history(dom, NextParser):
 	def _parse_history(para):
 		nonlocal found
 		if not found and para.get('history', True) and matchers.history(para):
-			_aaa(dom, 'annoGroup', heading="History", text=para['text'])
+			_aaa(dom, 'annoGroup', heading="History", text=para['richtext'])
 			found = True
 			return True
 		return False
@@ -194,7 +193,7 @@ def parse_section_text(dom, NextParser):
 			started = True
 			return True
 		elif not started:
-			_make_text(dom, para['text'])
+			_make_text(dom, para['richtext'])
 			return True
 		else:
 			return False
@@ -235,6 +234,7 @@ def _get_para_node_props(para):
 			skip = 2
 			props['heading'] = heading_match.group('heading')
 		props['text'] = _para_text_content(para, skip)
+		props['richtext'] = _para_rich_text_content(para, skip)
 	return props
 
 
@@ -282,6 +282,7 @@ def parse_section_nodes(dom, NextParser):
 					in_child = True
 					_merge(para, {'runs': [{'text': lambda t: parens_re.sub('  ', t, 1)}]})
 					para['text'] = _para_text_content(para)
+					para['richtext'] = _para_rich_text_content(para)
 					return next_parser(para)
 
 				in_child = False
@@ -308,9 +309,9 @@ def parse_section_nodes(dom, NextParser):
 				# lookahead to determine if text belongs to node or its parent
 				next_level = _get_next_level(para)
 				if para_node is not None and next_level and (not matchers.isint(level) or next_level >= level):
-					_make_text(para_node, para['text'], para=para['index'])
+					_make_text(para_node, para['richtext'], para=para['index'])
 				else:
-					_make_text(dom, para['text'], para=para['index'], after=True)
+					_make_text(dom, para['richtext'], para=para['index'], after=True)
 				return True
 			else:
 				return False
@@ -329,7 +330,7 @@ def parse_anno(dom, NextParser):
 			return True
 		elif anno_node is not None:
 			if matchers.anytext(para):
-				_make_text(anno_node, para['text'])
+				_make_text(anno_node, para['richtext'])
 			return True
 		else:
 			return False
@@ -351,7 +352,7 @@ def pipeline(*parsers, i=0):
 				return lambda para: False
 	return _next_parser
 
-def _make_node(parent, tag, text, **attrs):
+def _make_node(parent, tag, text='', children=[], **attrs):
 	""" Make a node in an XML document. """
 	attrs.pop('para', None)
 	n = etree.Element(tag)
@@ -359,6 +360,8 @@ def _make_node(parent, tag, text, **attrs):
 		parent.append(n)
 	if text:
 		n.text = text.strip()
+	for child in children:
+		n.append(child)
 	for k, v in attrs.items():
 		if v is None: continue
 		if isinstance(v, datetime.datetime):
@@ -376,7 +379,7 @@ def _aaa(parent, tag, prefix=None, num=None, heading=None, text=None, para=None,
 	  <num>{num}</num>
 	  <heading>{heading}</heading>
 	  <text>{text}</text>
-    </{tag}>
+	</{tag}>
 	returning the new level object
 	"""
 	level = _make_node(parent, tag, None, para=para)
@@ -428,19 +431,75 @@ def _make_placeholder(parent, reason=None, heading=None, section=None, section_s
 	return level
 
 def _make_text(parent, text=None, para=None, **kwargs):
-	if text:
+	if text is not None:
 		tag = 'text' if parent.find('para') is None else 'afterText'
-		return _make_node(parent, tag, text, para=para)
+		if type(text) == str:
+			return _make_node(parent, tag, text, para=para)
+		else:
+			return _make_node(parent, tag, text=text.text, children=text.getchildren(), para=para)
 	else:
 		return None
 
 def _para_text_content(p, skip = 0):
 	return "".join(r["text"].strip('\n') for r in p["runs"][skip:]).strip()
 
+def _is_run_rich(run):
+	props = run.get('properties', {})
+	return props.get('b') or props.get('i') or props.get('u')
+
+def _para_rich_text_content(para, skip = 0):
+	working_runs = para['runs'][skip:]
+	is_para_rich = any([_is_run_rich(r) for r in working_runs])
+	if not is_para_rich:
+		return _para_text_content(para, skip)
+
+	node = _make_node(None, 'text')
+	working_node = node
+
+	start_text = working_runs[0]['text']
+	working_runs[0]['text'] = start_text.lstrip()
+	end_text = working_runs[-1]['text']
+	working_runs[-1]['text'] = end_text.rstrip()
+
+	for r in working_runs:
+		run_text = r["text"].strip('\n')
+		new_node = None
+		props = r.get('properties', {})
+		if props.get('b'):
+			new_node = _make_node(None, 'strong', run_text)
+		if props.get('i'):
+			if new_node:
+				new_node = _make_node(None, 'em', children=[new_node])
+			else:
+				new_node = _make_node(None, 'em', run_text)
+		if props.get('u'):
+			if new_node:
+				new_node = _make_node(None, 'u', children=[new_node])
+			else:
+				new_node = _make_node(None, 'u', run_text)
+
+		if new_node is not None:
+			working_node.append(new_node)
+			working_node = new_node
+		elif working_node == node:
+			if node.text is None:
+				node.text = run_text
+			else:
+				node.text = node.text + run_text
+		else:
+				if working_node.tail is None:
+					working_node.tail = run_text
+				else:
+					working_node.tail = working_node.tail + run_text
+	working_runs[-1]['text'] = end_text
+	working_runs[0]['text'] = start_text
+	return node
+
 def _prepend(prepend_text, run=0):
 	def _prepend(para):
 		para['runs'][run]['text'] = prepend_text + para['runs'][run]['text']
 		para['text'] = _para_text_content(para)
+		para['richtext'] = _para_rich_text_content(para)
 		return False
 	return _prepend
 
@@ -482,6 +541,7 @@ def _update(new_para):
 	def _update(para):
 		_merge(para, new_para)
 		para['text'] = _para_text_content(para)
+		para['richtext'] = _para_rich_text_content(para)
 	return _update
 
 def bulk_apply(fix_fns, fn, start, end):

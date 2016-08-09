@@ -1,6 +1,6 @@
 import os, os.path, sys, json, time, re
 import lxml.etree as etree
-from parsers import Parser, _make_node, _para_text_content
+from parsers import Parser, _make_node, _para_text_content, _para_rich_text_content
 from worddoc import open_docx
 import matchers
 import copy
@@ -92,6 +92,7 @@ def _hashfile(filepath):
 def parse_doc_section(section, dom):
 	def prep_para(para):
 		para['text'] = _para_text_content(para)
+		para['richtext'] = _para_rich_text_content(para)
 		def next_para():
 			paras = section['paragraphs']
 			next_index = para['index'] - paras[0]['index'] + 1
