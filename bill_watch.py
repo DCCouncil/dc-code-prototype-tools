@@ -1,5 +1,5 @@
 import sys, time, os, lxml.etree as etree, re
-from parse_bill import parse
+from parse_law import parse
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler, FileCreatedEvent, DirCreatedEvent
 from pygments.lexers import XmlLexer
