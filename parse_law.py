@@ -19,6 +19,9 @@ from matchers import Matcher, isint, exists
 
 errors = 0
 
+def is_margin_note(para):
+	return para.get('properties', {}).get('style') == 'MarginNotes'
+
 class Para(dict):
 	def __init__(self, paras, para=None):
 		self._paras = paras
@@ -38,7 +41,7 @@ class Para(dict):
 			return None
 		if skip_empty and not para['text']:
 			return para.next(skip, skip_empty)
-		if skip_notes and para.get('properties', {}).get('style') == 'MarginNotes':
+		if skip_notes and is_margin_note(para):
 			return para.next(skip, skip_empty)
 		if skip:
 			return para.next(skip-1, skip_empty)
@@ -55,7 +58,7 @@ class Para(dict):
 		para = Para(self._paras, self._paras[index - 1])
 		if skip_empty and not para['text']:
 			return para.prev(skip, skip_empty)
-		if skip_notes and para.get('properties', {}).get('style') == 'MarginNotes':
+		if skip_notes and is_margin_note(para):
 			return para.prev(skip, skip_empty)
 		if skip:
 			return para.prev(skip-1, skip_empty)
@@ -211,6 +214,10 @@ def toc(dom, para, next_parser):
 		style = next_para.get('properties', {}).get('style', '')
 		para = next_para
 
+	# remove text of all margin notes
+	for p in para.paras:
+		if is_margin_note(p):
+			p['text'] = ''
 	next_parser(dom, para)
 	
 def short_title(dom, para, next_parser):
@@ -307,6 +314,8 @@ def is_include(para):
 	return bool((text.startswith('"') and (text.count('"') % 2 or trailing_quote_re.search(text))))
 
 def is_include_end(para):
+	if is_margin_note(para):
+		return False
 	text = para['text']
 	return bool((trailing_quote_re.search(text) and (text.startswith('"') or text.count('"') % 2)))
 
@@ -335,7 +344,7 @@ def include(dom, para, next_parser):
 	if include_para:
 		include_dom = make_node(dom, 'include')
 		for i_para in include_para.paras:
-			if not i_para['text']:
+			if not i_para['text'] or is_margin_note(i_para):
 				continue
 
 			text = i_para['text'].replace('\u201c', '"').replace('\u201d', '"')
