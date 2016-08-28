@@ -186,9 +186,13 @@ def header(dom, para, next_parser):
 
 	para = para.next(skip=1)
 	long_title = para['text']
-	short_title = short_title_re.search(_get_short_title_para(para)['text']).group('short_title')
-
-	make_node(dom, 'heading', short_title, type='short')
+	st_para = _get_short_title_para(para)
+	try:
+		short_title = short_title_re.search(st_para['text']).group('short_title')
+	except:
+		make_error(dom, st_para, reason='Unable to find short title')
+	else:
+		make_node(dom, 'heading', short_title, type='short')
 	make_node(dom, 'heading', long_title, type='long')
 	make_node(dom, 'meta')
 	next_parser(dom, para.next())
