@@ -419,7 +419,8 @@ parser = pipeline(
 def make_node(parent, tag, text='', **attrs):
 	"""Make a node in an XML document."""
 	n = etree.Element(tag)
-	parent.append(n)
+	if parent is not None:
+		parent.append(n)
 	if text:
 		n.text = text
 	for k, v in attrs.items():
@@ -476,6 +477,7 @@ def make_error(dom, para, reason=None):
 	errors += 1
 	error_dom = make_node(dom, 'error', para['text'], reason=reason)
 
+path_regex = re.compile(r'L0*(\d+)-0*(\d+)')
 def parse(path, save=False):
 	dom = etree.Element("document",
 		# attrib={
@@ -493,6 +495,11 @@ def parse(path, save=False):
 			json.dump(paras, f, indent=2)
 	parser(dom, Para(paras, paras[0]))
 
+	law_num = path_regex.search(path).groups()
+	law_num = '{}-{}'.format(*law_num)
+	dom.set('id', 'D.C. Law {}'.format(law_num))
+	num_node = make_node(None, 'num', law_num, type='law')
+	dom.insert(0, num_node)
 	return dom
 
 if __name__ == '__main__':
