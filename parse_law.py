@@ -226,7 +226,8 @@ def toc(dom, para, next_parser):
 	
 def short_title(dom, para, next_parser):
 	para = _get_short_title_para(para)
-	make_text(dom, para)
+	section = make_section(dom, None)
+	make_text(section, para)
 	next_parser(dom, para.next())
 
 def is_container(prefix):
@@ -459,8 +460,9 @@ def make_container(parent, prefix, num, heading):
 
 def make_section(parent, num, heading=None, **kwargs):
 	section = make_node(parent, 'section', None)
-	make_node(section, 'num', num)
-	if heading:
+	if num is not None:
+		make_node(section, 'num', num)
+	if heading is not None:
 		make_node(section, 'heading', heading, proof=True)
 	return section
 
